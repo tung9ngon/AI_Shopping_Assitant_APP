@@ -28,6 +28,12 @@ export class Conversation {
   @JoinColumn({ name: 'user_id' })
   user: User | null;
 
+  // Định danh thiết bị của khách chưa đăng nhập. Backend đặt cookie httpOnly `guest_id`
+  // lúc tạo phiên; chỉ thiết bị giữ đúng cookie đó mới đọc/ghi được phiên này. Khi phiên
+  // được gán cho một tài khoản (POST /conversations/claim) thì xoá về NULL.
+  @Column({ type: 'uuid', nullable: true })
+  guest_id: string | null;
+
   // Tiêu đề tự sinh từ tin nhắn đầu tiên
   @Column({ type: 'varchar', length: 255, nullable: true })
   title: string | null;

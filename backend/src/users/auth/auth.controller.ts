@@ -10,6 +10,7 @@ import {
   ForgotPasswordDto,
   VerifyResetOtpDto,
   ResetPasswordDto,
+  OAuthExchangeDto,
 } from './auth.dto';
 import {
   GoogleAuthGuard,
@@ -134,6 +135,25 @@ export class AuthController {
     return { message: 'Đã làm mới token' };
   }
 
+  // Kết thúc OAuth (chung cho Google/Facebook). Hai luồng:
+  // - Web: đặt cookie rồi redirect về frontendUrl như cũ.
+  // - Mobile (state=mobile, do guard chuyển từ ?platform=mobile): cookie không đi
+  //   qua được chuỗi redirect của trình duyệt về app, nên phát mã một lần rồi đưa
+  //   về deep link nextech://oauth?code=... — app đổi mã qua POST /auth/oauth/exchange.
+  private async finishOAuth(req: Request, res: Response) {
+    const profile = req.user as any;
+    const user = await this.authService.validateOAuthUser(profile);
+
+    if (req.query.state === 'mobile') {
+      const code = await this.authService.createOAuthCode(user.id);
+      return res.redirect(`nextech://oauth?code=${code}`);
+    }
+
+    const { accessToken, refreshToken } = await this.authService.issueTokens(user);
+    this.setAuthCookies(res, accessToken, refreshToken);
+    return res.redirect(this.config.get<string>('frontendUrl') as string);
+  }
+
   // Google
   @UseGuards(GoogleAuthGuard)
   @Get('google')
@@ -141,14 +161,10 @@ export class AuthController {
   }
 
   @UseGuards(GoogleAuthGuard)
-@Get('google/callback')
-async googleCallback(@Req() req: Request, @Res() res: Response) {
-  const profile = req.user as any;
-  const user = await this.authService.validateOAuthUser(profile);
-  const { accessToken, refreshToken } = await this.authService.issueTokens(user);
-  this.setAuthCookies(res, accessToken, refreshToken);
-  return res.redirect(this.config.get<string>('frontendUrl') as string);
-}
+  @Get('google/callback')
+  googleCallback(@Req() req: Request, @Res() res: Response) {
+    return this.finishOAuth(req, res);
+  }
 
   // Facebook
   @UseGuards(FacebookAuthGuard)
@@ -157,11 +173,18 @@ async googleCallback(@Req() req: Request, @Res() res: Response) {
 
   @UseGuards(FacebookAuthGuard)
   @Get('facebook/callback')
-  async facebookCallback(@Req() req: Request, @Res() res: Response) {
-    const profile = req.user as any;
-    const user = await this.authService.validateOAuthUser(profile);
+  facebookCallback(@Req() req: Request, @Res() res: Response) {
+    return this.finishOAuth(req, res);
+  }
+
+  // App mobile đổi mã một lần (nhận từ deep link) lấy cookie phiên — cùng dạng
+  // trả về với POST /auth/login.
+  @Post('oauth/exchange')
+  @HttpCode(200)
+  async oauthExchange(@Body() dto: OAuthExchangeDto, @Res({ passthrough: true }) res: Response) {
+    const user = await this.authService.exchangeOAuthCode(dto.code);
     const { accessToken, refreshToken } = await this.authService.issueTokens(user);
     this.setAuthCookies(res, accessToken, refreshToken);
-    return res.redirect(this.config.get<string>('frontendUrl') as string);
+    return { message: 'Đăng nhập thành công', user: { id: user.id, email: user.email, full_name: user.full_name } };
   }
 }

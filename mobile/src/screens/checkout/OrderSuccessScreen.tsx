@@ -1,16 +1,17 @@
 // Kết quả sau khi đặt hàng.
 //
-// Với PayOS, bản web phải hỏi lại server liên tục (polling GET /payments/:id/status).
-// Trên app, thông báo đẩy sẽ báo kết quả về — nên màn hình này nêu rõ điều đó thay vì
-// bắt người dùng ngồi chờ. Phần đẩy thông báo thuộc UC-MOB-01, làm ở vòng sau.
+// COD: đến thẳng từ Checkout sau khi tạo đơn. PayOS: chỉ đến được từ PayosPaymentScreen
+// SAU KHI backend xác nhận đã thanh toán xong — nên nhánh PayOS ở đây là "đã trả tiền",
+// không được nhắc người dùng đi chuyển khoản nữa.
 import { StyleSheet, Text, View } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@react-native-vector-icons/ionicons/static';
 import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
 import Screen from '../../components/Screen';
 import AppButton from '../../components/AppButton';
-import { colors, radius, shadow, spacing } from '../../theme';
+import Gradient from '../../components/Gradient';
+import { colors, gradient, radius, shadow, spacing } from '../../theme';
 import { formatVND } from '../../utils/format';
 import type { RootStackParamList } from '../../navigation/types';
 
@@ -25,14 +26,14 @@ export default function OrderSuccessScreen() {
   return (
     <Screen edges={[]}>
       <View style={styles.wrap}>
-        <View style={styles.iconCircle}>
-          <Ionicons name="checkmark" size={38} color={colors.textInverse} />
-        </View>
+        <Gradient colors={gradient.success} style={styles.iconCircle}>
+          <Ionicons name="checkmark" size={40} color={colors.textInverse} />
+        </Gradient>
 
-        <Text style={styles.title}>Đã tạo đơn hàng</Text>
+        <Text style={styles.title}>{isPayos ? 'Thanh toán thành công' : 'Đã tạo đơn hàng'}</Text>
         <Text style={styles.desc}>
           {isPayos
-            ? 'Bấm nút bên dưới để mở ứng dụng ngân hàng và hoàn tất chuyển khoản. Thanh toán xong, hệ thống sẽ báo lại cho bạn.'
+            ? 'Đơn hàng đã được thanh toán qua PayOS. Chúng tôi sẽ chuẩn bị và giao hàng cho bạn sớm nhất.'
             : 'Đơn của bạn đang chờ xử lý. Bạn trả tiền mặt cho người giao hàng khi nhận hàng.'}
         </Text>
 
@@ -45,23 +46,9 @@ export default function OrderSuccessScreen() {
           />
         </View>
 
-        {isPayos ? (
-          <View style={styles.note}>
-            <Ionicons name="phone-portrait-outline" size={16} color={colors.primary} />
-            <Text style={styles.noteText}>
-              Trên bản web bạn phải cầm điện thoại quét mã trên màn hình máy tính. Trong app, ngân
-              hàng mở thẳng — bỏ hẳn một bước.
-            </Text>
-          </View>
-        ) : null}
-
         <View style={styles.actions}>
-          {isPayos ? (
-            <AppButton title="Mở ứng dụng ngân hàng" icon="open-outline" block onPress={() => {}} />
-          ) : null}
           <AppButton
             title="Xem đơn hàng của tôi"
-            variant={isPayos ? 'outline' : 'primary'}
             block
             onPress={() => navigation.replace('Orders')}
           />
@@ -101,15 +88,19 @@ function Row({
 const styles = StyleSheet.create({
   wrap: { flex: 1, alignItems: 'center', paddingHorizontal: spacing.xl, paddingTop: spacing.xxl },
   iconCircle: {
-    width: 76,
-    height: 76,
-    borderRadius: 38,
-    backgroundColor: colors.success,
+    width: 84,
+    height: 84,
+    borderRadius: 42,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: spacing.lg,
+    shadowColor: '#389e0d',
+    shadowOpacity: 0.28,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 5,
   },
-  title: { fontSize: 22, fontWeight: '800', color: colors.text },
+  title: { fontSize: 24, fontWeight: '800', color: colors.text, letterSpacing: -0.5 },
   desc: {
     fontSize: 14,
     color: colors.textSecondary,
@@ -121,7 +112,7 @@ const styles = StyleSheet.create({
   card: {
     alignSelf: 'stretch',
     backgroundColor: colors.surface,
-    borderRadius: radius.lg,
+    borderRadius: radius.xl,
     padding: spacing.lg,
     marginTop: spacing.xl,
     ...shadow.card,
@@ -131,17 +122,6 @@ const styles = StyleSheet.create({
   rowValue: { fontSize: 13.5, color: colors.text, fontWeight: '600', flexShrink: 1, textAlign: 'right' },
   rowValueStrong: { fontSize: 16, fontWeight: '800', color: colors.primary },
   rowValueMono: { fontVariant: ['tabular-nums'] },
-
-  note: {
-    flexDirection: 'row',
-    gap: spacing.sm,
-    alignSelf: 'stretch',
-    marginTop: spacing.lg,
-    padding: spacing.md,
-    borderRadius: radius.md,
-    backgroundColor: colors.primarySoft,
-  },
-  noteText: { flex: 1, fontSize: 12, color: colors.textSecondary, lineHeight: 17 },
 
   actions: { alignSelf: 'stretch', gap: spacing.sm, marginTop: spacing.xl },
 });

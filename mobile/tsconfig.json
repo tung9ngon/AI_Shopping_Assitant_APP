@@ -1,6 +1,10 @@
 {
-  "extends": "expo/tsconfig.base",
+  "extends": "@react-native/typescript-config",
   "compilerOptions": {
-    "strict": true
-  }
+    "strict": true,
+    // Base config của React Native khai "types": ["jest"]; dự án chưa có test nên gỡ ra.
+    "types": []
+  },
+  "include": ["**/*.ts", "**/*.tsx"],
+  "exclude": ["**/node_modules", "**/Pods"]
 }

@@ -1,5 +1,5 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@react-native-vector-icons/ionicons/static';
 import { colors, radius, spacing } from '../theme';
 
 export default function QuantityStepper({
@@ -25,7 +25,7 @@ export default function QuantityStepper({
         accessibilityLabel="Giảm số lượng"
         onPress={() => step(-1)}
         disabled={value <= min}
-        style={styles.btn}
+        style={({ pressed }) => [styles.btn, pressed && value > min && styles.btnPressed]}
       >
         <Ionicons name="remove" size={16} color={value <= min ? colors.borderStrong : colors.text} />
       </Pressable>
@@ -35,7 +35,7 @@ export default function QuantityStepper({
         accessibilityLabel="Tăng số lượng"
         onPress={() => step(1)}
         disabled={value >= max}
-        style={styles.btn}
+        style={({ pressed }) => [styles.btn, pressed && value < max && styles.btnPressed]}
       >
         <Ionicons name="add" size={16} color={value >= max ? colors.borderStrong : colors.text} />
       </Pressable>
@@ -49,12 +49,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderWidth: 1,
     borderColor: colors.border,
-    borderRadius: radius.md,
+    borderRadius: radius.pill,
+    backgroundColor: colors.surfaceAlt,
     overflow: 'hidden',
   },
-  btn: { width: 32, height: 30, alignItems: 'center', justifyContent: 'center' },
+  btn: { width: 38, height: 36, alignItems: 'center', justifyContent: 'center' },
+  btnPressed: { backgroundColor: colors.border },
   value: {
-    minWidth: 32,
+    minWidth: 34,
     textAlign: 'center',
     fontSize: 14,
     fontWeight: '600',

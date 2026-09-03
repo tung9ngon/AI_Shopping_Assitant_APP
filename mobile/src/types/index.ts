@@ -1,15 +1,6 @@
 // ===== Kiểu dữ liệu dùng chung, ánh xạ theo entity/DTO của backend NestJS =====
 
 export type UserRole = 'user' | 'admin';
-export type AuthProvider = 'local' | 'google' | 'facebook';
-
-export interface AuthUser {
-  id: string;
-  email: string | null;
-  full_name: string;
-  role?: UserRole;
-  avatar_url?: string | null;
-}
 
 // ---- Hồ sơ tài khoản (GET/PUT /api/users/me) ----
 export interface MeAccount {
@@ -25,7 +16,8 @@ export interface MeAccount {
 
 export interface UpdateMePayload {
   full_name?: string;
-  phone_number?: string;
+  // null = xoá số điện thoại. Không gửi chuỗi rỗng — @Matches phía BE từ chối ''.
+  phone_number?: string | null;
   avatar_url?: string;
 }
 
@@ -70,6 +62,11 @@ export interface ProductImage {
   sort_order: number;
 }
 
+// Ảnh đại diện của sản phẩm: ưu tiên ảnh gắn cờ is_primary, không có thì lấy ảnh đầu.
+export function primaryImageOf(images: ProductImage[] | undefined): string | null {
+  return images?.find((img) => img.is_primary)?.image_url ?? images?.[0]?.image_url ?? null;
+}
+
 export interface ProductSpec {
   id: string;
   spec_key: string;
@@ -88,9 +85,10 @@ export interface Product {
   name: string;
   category_id: string | null;
   brand: string | null;
-  price: string | number; // decimal -> string ở runtime
-  rating: string | null;
+  price: number; // decimal -> chuỗi ở runtime, productApi đã ép về number
+  rating: number | null; // như trên
   description: string | null;
+  stock_quantity: number;
   is_active: boolean;
   created_at: string;
   updated_at: string;
@@ -116,7 +114,7 @@ export interface Address {
 export interface CartItemProduct {
   id: string;
   name: string;
-  price: string | number; // decimal -> string ở runtime
+  price: number; // decimal -> chuỗi ở runtime, cartApi đã ép về number
   image: string | null; // URL ảnh primary hoặc null (KHÔNG phải mảng)
 }
 
@@ -140,78 +138,22 @@ export type OrderStatus =
   | 'paid'
   | 'shipped';
 
-export interface OrderItem {
-  id: string;
-  product_id: string;
-  quantity: number;
-  unit_price: number;
-  product?: Product;
-}
-
-export interface Order {
-  id: string;
-  user_id: string;
-  cart_id: string | null;
-  discount_code_id: string | null;
-  subtotal: number;
-  shipping_fee: number;
-  discount_amount: number;
-  total: number;
-  status: OrderStatus;
-  note: string | null;
-  created_at: string;
-  updated_at: string;
-  items?: OrderItem[];
-  payment?: Payment;
-  user?: { id: string; full_name: string; email: string | null };
-}
+// Bản ghi Order/OrderItem đầy đủ nằm ở src/api/orders.ts (OrderDetail…) — response
+// thật của backend. Đừng thêm lại bản sao entity ở đây kẻo import nhầm kiểu lệch shape.
 
 // ---- Discount code ----
+// Bản ghi chi tiết nằm ở src/api/discounts.ts (DiscountCodeItem).
 export type VoucherCategory = 'order' | 'free_shipping';
 export type DiscountType = 'percent' | 'fixed_amount';
-export interface DiscountCode {
-  id: string;
-  code: string;
-  description: string | null;
-  category: VoucherCategory;
-  discount_type: DiscountType;
-  discount_value: number;
-  min_order_value: number | null;
-  max_discount: number | null;
-  usage_limit: number | null;
-  used_count?: number;
-  valid_from: string | null;
-  valid_until: string | null;
-  is_active: boolean;
-  status?: 'running' | 'paused' | 'upcoming' | 'expired';
-  created_at?: string;
-}
 
 // ---- Price alert ----
+// Bản ghi chi tiết nằm ở src/api/priceAlerts.ts (PriceAlertItem).
 export type NotifyChannel = 'app' | 'email' | 'sms';
-export interface PriceAlert {
-  id: string;
-  product_id: string;
-  target_price: number;
-  notify_channel: NotifyChannel;
-  is_active?: boolean;
-  created_at: string;
-  product?: Product;
-}
 
 // ---- Payment ----
+// Bản ghi chi tiết nằm ở src/api/payments.ts (CreatedPayment, PaymentStatusInfo).
 export type PaymentMethod = 'cod' | 'payos';
 export type PaymentStatus = 'pending' | 'success' | 'failed' | 'refunded';
-export interface Payment {
-  id: string;
-  order_id: string;
-  method: PaymentMethod;
-  status: PaymentStatus;
-  amount: number;
-  checkout_url?: string | null;
-  created_at: string;
-  updated_at: string;
-}
 
 // ---- Phản hồi phân trang thường gặp ----
 export interface Paginated<T> {
@@ -226,4 +168,9 @@ export interface Paginated<T> {
 // Lấy mảng phần tử từ response phân trang — backend có thể trả `data` hoặc `items`.
 export function getItems<T>(res: Paginated<T>): T[] {
   return res.items ?? res.data ?? [];
+}
+
+// Biến đổi từng phần tử của trang mà giữ nguyên phong bì phân trang (total, page…).
+export function mapItems<T, U>(res: Paginated<T>, fn: (item: T) => U): Paginated<U> {
+  return { ...res, items: res.items?.map(fn), data: res.data?.map(fn) };
 }

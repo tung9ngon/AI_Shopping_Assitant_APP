@@ -14,9 +14,9 @@ export default function Tag({ label, color = 'default' }: { label: string; color
 
 const styles = StyleSheet.create({
   wrap: {
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 3,
-    borderRadius: radius.sm,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 4,
+    borderRadius: radius.pill,
     alignSelf: 'flex-start',
   },
   text: { fontSize: 12, fontWeight: '600' },

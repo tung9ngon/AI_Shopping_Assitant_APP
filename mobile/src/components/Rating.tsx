@@ -1,5 +1,5 @@
 import { StyleSheet, Text, View } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@react-native-vector-icons/ionicons/static';
 import { colors, spacing } from '../theme';
 
 export default function Rating({
@@ -17,7 +17,7 @@ export default function Rating({
   }
   return (
     <View style={styles.row}>
-      <Ionicons name="star" size={size} color="#faad14" />
+      <Ionicons name="star" size={size} color={colors.warning} />
       <Text style={[styles.score, { fontSize: size }]}>{score.toFixed(1)}</Text>
       {count != null ? <Text style={[styles.muted, { fontSize: size }]}>({count})</Text> : null}
     </View>

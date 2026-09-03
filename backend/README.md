@@ -1,98 +1,81 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+# NexTech Backend — API NestJS
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+API cho **AI Shopping Assistant (NexTech)**: bán hàng điện tử kèm trợ lý tư vấn.
+Dùng chung cho cả bản web và bản di động trong kho này (`../mobile`).
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+Nền tảng: **NestJS 11**, TypeScript, **TypeORM + PostgreSQL**, Redis (`ioredis`).
+Bên ngoài: **Gemini** (`@google/generative-ai`) cho trợ lý, **PayOS** (`@payos/node`)
+cho thanh toán, **Cloudinary** cho ảnh sản phẩm, **nodemailer** cho thư OTP.
 
-## Description
-
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
-
-## Project setup
+## Chạy
 
 ```bash
-$ npm install
+npm install
+npm run start:dev     # nest start --watch
 ```
 
-## Compile and run the project
+Cần một file `.env` đặt ngay trong `backend/` — file này **không được commit**
+(`.gitignore`). Kho chưa có `.env.example`; danh sách biến ở mục dưới.
 
-```bash
-# development
-$ npm run start
+Máy chủ chạy ở cổng `PORT` và mọi route đều có tiền tố `/api`
+(`app.setGlobalPrefix('api')` trong `src/main.ts`).
 
-# watch mode
-$ npm run start:dev
+## Biến môi trường
 
-# production mode
-$ npm run start:prod
+Khai trong `src/config/configuration.ts`, trừ nhóm Cloudinary đọc thẳng từ `.env`.
+
+| Nhóm | Biến |
+|---|---|
+| Máy chủ | `PORT`, `NODE_ENV`, `REDIRECT_URI` (địa chỉ web để chuyển hướng sau OAuth) |
+| PostgreSQL | `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASS`, `DB_NAME` |
+| JWT | `JWT_SECRET`, `JWT_EXPIRES_IN`, `JWT_REFRESH_SECRET`, `JWT_REFRESH_EXPIRES_IN` |
+| Redis | `REDIS_HOST`, `REDIS_PORT`, `REDIS_PASSWORD`, `REDIS_TLS` |
+| Thư (OTP) | `MAIL_HOST`, `MAIL_PORT`, `MAIL_USER`, `MAIL_PASS` |
+| Google OAuth | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_CALLBACK_URL` |
+| Facebook OAuth | `FACEBOOK_APP_ID`, `FACEBOOK_APP_SECRET`, `FACEBOOK_CALLBACK_URL` |
+| PayOS | `PAYOS_CLIENT_ID`, `PAYOS_API_KEY`, `PAYOS_CHECKSUM_KEY` |
+| Gemini | `GEMINI_API_KEY`, `GEMINI_MODEL` |
+| Cloudinary | `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET` |
+
+## Cấu trúc
+
+```
+src/
+  main.ts       Khai AppModule + bootstrap (cookie-parser, ValidationPipe, CORS, prefix)
+  config/       configuration.ts (đọc .env), redis.ts
+  database/     Entity TypeORM
+  users/        Nghiệp vụ phía người mua — mỗi thư mục một module
+  admin/        Nghiệp vụ phía quản trị
+  cloudinary/   Provider tải ảnh
 ```
 
-## Run tests
+## Nhóm endpoint
 
-```bash
-# unit tests
-$ npm run test
+Tất cả nằm dưới `/api`.
 
-# e2e tests
-$ npm run test:e2e
+| Phía | Route |
+|---|---|
+| Người mua | `auth`, `categories`, `products`, `cart`, `orders`, `payments`, `discount-codes`, `price-alerts`, `chat`, `conversations`, `users/me`, `users/me/addresses` |
+| Quản trị | `admin/categories`, `admin/products`, `admin/orders`, `admin/payments`, `admin/discount-codes`, `admin/conversations`, `admin/users`, `admin/statistics` |
+| Khác | `webhooks/payos` |
 
-# test coverage
-$ npm run test:cov
-```
+## Ghi chú kỹ thuật
 
-## Deployment
-
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
-
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
-
-```bash
-$ npm install -g @nestjs/mau
-$ mau deploy
-```
-
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
-
-## Resources
-
-Check out a few resources that may come in handy when working with NestJS:
-
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
-
-## Support
-
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
-
-## Stay in touch
-
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
-
-## License
-
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+- **Đăng nhập trả cookie httpOnly, không trả token trong body.** `jwt.strategy.ts` chỉ
+  đọc `req.cookies.access_token` / `refresh_token`. Client nào không giữ được cookie thì
+  không gọi được API.
+- **OAuth trên mobile đi bằng mã một lần.** App gọi `GET /auth/<provider>?platform=mobile`;
+  callback thấy `state=mobile` thì không đặt cookie mà phát mã một lần (Redis, TTL 60 giây)
+  rồi redirect về deep link `nextech://oauth?code=...`; app đổi mã lấy cookie phiên qua
+  `POST /auth/oauth/exchange` (xem `../mobile/README.md`).
+- **`JwtAccessGuard` tự làm mới token ngầm** bằng `refresh_token` trước khi trả 401, nên
+  client không cần tự gọi `/auth/refresh`.
+- **`synchronize: true`** trong `main.ts`: TypeORM tự đổi cấu trúc bảng theo entity mỗi
+  lần khởi động. Tiện lúc làm, nhưng chạy thật thì phải tắt và chuyển sang migration —
+  nếu không, sửa nhầm một entity là mất dữ liệu.
+- **CORS chỉ mở cho `http://localhost:3000`** (bản web chạy máy cục bộ). Bản di động
+  không bị chặn vì React Native không áp CORS. Đưa web lên máy chủ thật thì phải sửa.
+- **`ValidationPipe` bật `forbidNonWhitelisted`**: gửi thừa một trường không khai trong
+  DTO là bị trả 400, không phải bị bỏ qua.
+- **Cảnh báo giá chạy bằng cron 30 giây một lượt** (`@Cron('*/30 * * * * *')` trong
+  `users/pricealert/pricealert.service.ts`), cần `ScheduleModule.forRoot()` ở `main.ts`.

@@ -1,34 +1,40 @@
 // UC-AUTH-01 — Đăng ký tài khoản bằng email và mã OTP.
 //
-// Ba bước đúng theo luồng backend: nhập email → nhận OTP 6 số (hiệu lực 5 phút) →
-// xác thực rồi đặt mật khẩu (có 10 phút để hoàn tất). Đồng hồ đếm ngược dưới đây hiển
-// thị đúng hai mốc thời gian đó.
-import { useEffect, useRef, useState } from 'react';
+// Ba bước đúng theo luồng backend: POST /auth/send-otp → POST /auth/verify-otp →
+// POST /auth/register. Mã OTP hiệu lực 5 phút, sau khi xác thực có 10 phút để hoàn tất.
+// Đăng ký xong backend KHÔNG tự đăng nhập, nên app gọi tiếp /auth/login.
+import { useEffect, useState } from 'react';
 import {
+  Alert,
   KeyboardAvoidingView,
   Platform,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   View,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
 import Screen from '../../components/Screen';
 import AppButton from '../../components/AppButton';
 import TextField from '../../components/TextField';
+import OtpInput, { OTP_LENGTH } from '../../components/OtpInput';
+import StepIndicator from '../../components/StepIndicator';
 import { useAuth } from '../../context/AuthContext';
-import { colors, radius, spacing } from '../../theme';
+import { authApi } from '../../api/auth';
+import { getErrorMessage } from '../../api/client';
+import { useCooldown } from '../../hooks/useCooldown';
+import { colors, spacing } from '../../theme';
+import { PASSWORD_MESSAGE, PASSWORD_REGEX } from '../../constants';
 import type { RootStackParamList } from '../../navigation/types';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
-const OTP_LENGTH = 6;
 const OTP_TTL_SECONDS = 5 * 60; // khớp thời hạn mã OTP lưu trong Redis
+const RESEND_COOLDOWN_SECONDS = 60; // cùng nhịp với màn Quên mật khẩu
+
 
 const STEPS = ['Email', 'Mã xác thực', 'Mật khẩu'];
 
@@ -43,33 +49,101 @@ export default function RegisterScreen() {
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
   const [error, setError] = useState('');
+  const [submitting, setSubmitting] = useState(false);
   const [secondsLeft, setSecondsLeft] = useState(OTP_TTL_SECONDS);
+  // Tăng mỗi lần THỰC SỰ gửi OTP — đồng hồ hiệu lực chỉ chạy lại theo nó, không chạy
+  // lại khi quay về bước 2 từ bước 3 (mã cũ vẫn là mã cũ, hạn không đổi).
+  const [otpRound, setOtpRound] = useState(0);
 
-  const otpInputRef = useRef<TextInput>(null);
-
-  // Đồng hồ đếm ngược hiệu lực mã OTP.
+  // Đồng hồ đếm ngược hiệu lực mã OTP, chạy theo từng lượt gửi mã.
   useEffect(() => {
-    if (step !== 1) return;
+    if (otpRound === 0) return;
     setSecondsLeft(OTP_TTL_SECONDS);
     const timer = setInterval(() => setSecondsLeft((s) => (s > 0 ? s - 1 : 0)), 1000);
     return () => clearInterval(timer);
-  }, [step]);
+  }, [otpRound]);
 
-  const next = () => {
+  // Chặn bấm gửi lại dồn dập — không bắt người dùng chờ hết hạn mã 5 phút mới xin
+  // được mã mới (email vào spam là kẹt cứng).
+  const { cooldown, startCooldown } = useCooldown(RESEND_COOLDOWN_SECONDS);
+
+  const next = async () => {
     setError('');
+
     if (step === 0) {
       if (!email.includes('@')) return setError('Email chưa đúng định dạng');
-      return setStep(1);
+      setSubmitting(true);
+      try {
+        await authApi.sendOtp(email.trim());
+        setOtpRound((r) => r + 1);
+        startCooldown();
+        setStep(1);
+      } catch (err) {
+        setError(getErrorMessage(err));
+      } finally {
+        setSubmitting(false);
+      }
+      return;
     }
+
     if (step === 1) {
       if (otp.length < OTP_LENGTH) return setError(`Mã xác thực gồm ${OTP_LENGTH} chữ số`);
-      return setStep(2);
+      if (secondsLeft === 0) return setError('Mã đã hết hạn, vui lòng gửi lại');
+      setSubmitting(true);
+      try {
+        await authApi.verifyOtp(email.trim(), otp);
+        setStep(2);
+      } catch (err) {
+        setError(getErrorMessage(err));
+      } finally {
+        setSubmitting(false);
+      }
+      return;
     }
+
     if (!fullName.trim()) return setError('Vui lòng nhập họ tên');
-    if (password.length < 6) return setError('Mật khẩu tối thiểu 6 ký tự');
+    if (!PASSWORD_REGEX.test(password)) return setError(PASSWORD_MESSAGE);
     if (password !== confirm) return setError('Hai mật khẩu chưa khớp');
-    signIn();
-    navigation.navigate('Tabs', { screen: 'Account' });
+
+    setSubmitting(true);
+    try {
+      await authApi.register({ email: email.trim(), password, full_name: fullName.trim() });
+    } catch (err) {
+      setError(getErrorMessage(err));
+      setSubmitting(false);
+      return;
+    }
+
+    // Tài khoản ĐÃ tạo xong — tự đăng nhập hỏng (mạng chập chờn) không được hiện như
+    // đăng ký thất bại: bấm "Tạo tài khoản" lần nữa sẽ nhận "email đã tồn tại" oan.
+    try {
+      await signIn(email.trim(), password);
+      navigation.navigate('Tabs', { screen: 'Account' });
+    } catch {
+      Alert.alert(
+        'Tài khoản đã được tạo',
+        'Chưa tự đăng nhập được, vui lòng đăng nhập bằng email và mật khẩu vừa đặt.',
+      );
+      navigation.replace('Login');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // Gửi lại mã: gọi lại đúng endpoint gửi OTP, đồng hồ hiệu lực chạy lại từ đầu.
+  const resendOtp = async () => {
+    setError('');
+    setSubmitting(true);
+    try {
+      await authApi.sendOtp(email.trim());
+      setOtp('');
+      setOtpRound((r) => r + 1);
+      startCooldown();
+    } catch (err) {
+      setError(getErrorMessage(err));
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const mmss = `${String(Math.floor(secondsLeft / 60)).padStart(2, '0')}:${String(
@@ -80,26 +154,7 @@ export default function RegisterScreen() {
     <Screen edges={[]}>
       <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-          {/* ---- Chỉ báo bước ---- */}
-          <View style={styles.stepper}>
-            {STEPS.map((label, i) => {
-              const done = i < step;
-              const active = i === step;
-              return (
-                <View key={label} style={styles.stepItem}>
-                  {i > 0 ? <View style={[styles.stepLine, i <= step && styles.stepLineDone]} /> : null}
-                  <View style={[styles.stepDot, (done || active) && styles.stepDotActive]}>
-                    {done ? (
-                      <Ionicons name="checkmark" size={13} color={colors.textInverse} />
-                    ) : (
-                      <Text style={[styles.stepNum, active && styles.stepNumActive]}>{i + 1}</Text>
-                    )}
-                  </View>
-                  <Text style={[styles.stepLabel, active && styles.stepLabelActive]}>{label}</Text>
-                </View>
-              );
-            })}
-          </View>
+          <StepIndicator steps={STEPS} current={step} />
 
           {step === 0 ? (
             <View style={styles.form}>
@@ -128,28 +183,7 @@ export default function RegisterScreen() {
                 Mã gồm {OTP_LENGTH} chữ số vừa được gửi tới <Text style={styles.strong}>{email}</Text>.
               </Text>
 
-              {/* Sáu ô hiển thị, nhận ký tự qua một ô nhập trong suốt phủ lên trên */}
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="Nhập mã xác thực"
-                onPress={() => otpInputRef.current?.focus()}
-                style={styles.otpRow}
-              >
-                {Array.from({ length: OTP_LENGTH }).map((_, i) => (
-                  <View key={i} style={[styles.otpBox, otp.length === i && styles.otpBoxActive]}>
-                    <Text style={styles.otpDigit}>{otp[i] ?? ''}</Text>
-                  </View>
-                ))}
-                <TextInput
-                  ref={otpInputRef}
-                  value={otp}
-                  onChangeText={(t) => setOtp(t.replace(/\D/g, '').slice(0, OTP_LENGTH))}
-                  keyboardType="number-pad"
-                  maxLength={OTP_LENGTH}
-                  style={styles.otpHiddenInput}
-                  autoFocus
-                />
-              </Pressable>
+              <OtpInput value={otp} onChange={setOtp} autoFocus />
 
               {error ? <Text style={styles.error}>{error}</Text> : null}
 
@@ -161,12 +195,12 @@ export default function RegisterScreen() {
                 )}
                 <Pressable
                   accessibilityRole="button"
-                  onPress={() => setSecondsLeft(OTP_TTL_SECONDS)}
-                  disabled={secondsLeft > 0}
+                  onPress={resendOtp}
+                  disabled={cooldown > 0 || submitting}
                   hitSlop={6}
                 >
-                  <Text style={[styles.resendLink, secondsLeft > 0 && styles.resendLinkOff]}>
-                    Gửi lại mã
+                  <Text style={[styles.resendLink, cooldown > 0 && styles.resendLinkOff]}>
+                    {cooldown > 0 ? `Gửi lại sau ${cooldown}s` : 'Gửi lại mã'}
                   </Text>
                 </Pressable>
               </View>
@@ -189,7 +223,7 @@ export default function RegisterScreen() {
                 icon="lock-closed-outline"
                 value={password}
                 onChangeText={setPassword}
-                placeholder="Tối thiểu 6 ký tự"
+                placeholder="Tối thiểu 8 ký tự, có chữ hoa và số"
                 secureTextEntry
                 autoCapitalize="none"
               />
@@ -209,6 +243,7 @@ export default function RegisterScreen() {
           <AppButton
             title={step === 2 ? 'Tạo tài khoản' : 'Tiếp tục'}
             block
+            loading={submitting}
             onPress={next}
             style={styles.submit}
           />
@@ -226,58 +261,12 @@ const styles = StyleSheet.create({
   flex: { flex: 1 },
   scroll: { padding: spacing.xl, gap: spacing.md },
 
-  stepper: { flexDirection: 'row', marginBottom: spacing.xl },
-  stepItem: { flex: 1, alignItems: 'center', gap: spacing.sm },
-  stepLine: {
-    position: 'absolute',
-    right: '50%',
-    top: 13,
-    width: '100%',
-    height: 2,
-    backgroundColor: colors.border,
-  },
-  stepLineDone: { backgroundColor: colors.primary },
-  stepDot: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: colors.border,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  stepDotActive: { backgroundColor: colors.primary },
-  stepNum: { fontSize: 12, fontWeight: '700', color: colors.textMuted },
-  stepNumActive: { color: colors.textInverse },
-  stepLabel: { fontSize: 11, color: colors.textMuted },
-  stepLabelActive: { color: colors.text, fontWeight: '600' },
 
   form: { gap: spacing.lg },
-  title: { fontSize: 22, fontWeight: '800', color: colors.text },
+  title: { fontSize: 24, fontWeight: '800', color: colors.text, letterSpacing: -0.5 },
   desc: { fontSize: 14, color: colors.textSecondary, lineHeight: 20, marginTop: -spacing.sm },
   strong: { fontWeight: '700', color: colors.text },
 
-  otpRow: { flexDirection: 'row', gap: spacing.sm, justifyContent: 'space-between' },
-  otpBox: {
-    flex: 1,
-    height: 54,
-    borderRadius: radius.md,
-    borderWidth: 1.5,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  otpBoxActive: { borderColor: colors.primary },
-  otpDigit: { fontSize: 20, fontWeight: '700', color: colors.text },
-  otpHiddenInput: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    opacity: 0,
-    fontSize: 1,
-  },
 
   error: { fontSize: 12.5, color: colors.danger },
   resendRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },

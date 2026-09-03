@@ -58,6 +58,6 @@ export class ProductController {
     @Body() dto: CreateProductReviewDto,
     @Req() req: any,
   ) {
-    return this.productService.createReview(id, req.user.id, dto);
+    return this.productService.createReview(id, req.user.sub, dto);
   }
 }

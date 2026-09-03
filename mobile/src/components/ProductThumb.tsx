@@ -1,10 +1,18 @@
 // Ảnh sản phẩm.
 //
-// Backend lưu ảnh trên Cloudinary; dữ liệu mẫu của vòng dựng giao diện chưa có ảnh thật
-// nên hiển thị ảnh thay thế mang nhận diện cửa hàng: nền pha màu theo danh mục kèm
-// glyph tương ứng. Khi đấu API thật, truyền `uri` vào là tự chuyển sang ảnh thật.
-import { Image, StyleSheet, View } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+// Backend lưu ảnh trên Cloudinary. Sản phẩm chưa có ảnh (hoặc endpoint không trả ảnh)
+// thì vẽ ảnh thay thế mang nhận diện cửa hàng: nền pha màu theo danh mục kèm biểu tượng
+// tương ứng — truyền `icon` là trường `icon` của danh mục (emoji hoặc URL, xem
+// CategoryIcon), không có thì rơi về glyph chung.
+import {
+  Image,
+  StyleSheet,
+  View,
+  type ImageStyle,
+  type StyleProp,
+  type ViewStyle,
+} from 'react-native';
+import CategoryIcon from './CategoryIcon';
 import { colors, radius } from '../theme';
 
 const CATEGORY_TINT: Record<string, string> = {
@@ -34,7 +42,8 @@ export default function ProductThumb({
   uri?: string | null;
   icon?: string | null;
   size: number;
-  style?: object;
+  // Áp cho cả nhánh Image lẫn nhánh placeholder (View) — giao của hai kiểu style.
+  style?: StyleProp<ImageStyle & ViewStyle>;
 }) {
   const box = { width: size, height: size, borderRadius: radius.lg };
 
@@ -52,10 +61,11 @@ export default function ProductThumb({
         style,
       ]}
     >
-      <Ionicons
-        name={key as keyof typeof Ionicons.glyphMap}
+      <CategoryIcon
+        icon={icon}
         size={size * 0.42}
         color={CATEGORY_FG[key] ?? colors.textMuted}
+        fallback="hardware-chip-outline"
       />
     </View>
   );

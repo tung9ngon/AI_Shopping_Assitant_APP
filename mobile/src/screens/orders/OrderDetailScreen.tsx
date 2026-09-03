@@ -1,59 +1,76 @@
-// UC-ORDER-04 — Xem chi tiết đơn hàng.
-// UC-ORDER-05 — Huỷ đơn hàng (chỉ khi đơn đang ở pending hoặc simulated_success).
-import { useMemo, useState } from 'react';
-import { Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import { useRoute, type RouteProp } from '@react-navigation/native';
+// UC-ORDER-04 — Xem chi tiết đơn hàng (GET /api/orders/:id).
+// UC-ORDER-05 — Huỷ đơn hàng (PUT /api/orders/:id/cancel, chỉ khi đơn đang ở pending
+// hoặc simulated_success — backend cũng chặn lại nếu đơn đã được xử lý).
+//
+// Địa chỉ giao hàng lấy từ chính đơn (backend chép lại lúc đặt), không tra sổ địa chỉ:
+// sửa hay xoá địa chỉ về sau không được làm đổi đơn đã đặt.
+import { useState } from 'react';
+import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import Ionicons, { type IoniconsIconName } from '@react-native-vector-icons/ionicons/static';
+import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
 import Screen from '../../components/Screen';
 import AppButton from '../../components/AppButton';
 import Card from '../../components/Card';
+import { GrandTotalRow, SummaryRow } from '../../components/OrderSummary';
+import LoadState from '../../components/LoadState';
 import ProductThumb from '../../components/ProductThumb';
 import Tag from '../../components/Tag';
-import { colors, radius, spacing } from '../../theme';
-import {
-  ORDER_STATUS_COLOR,
-  ORDER_STATUS_LABEL,
-  PAYMENT_STATUS_COLOR,
-  PAYMENT_STATUS_LABEL,
-  formatDate,
-  formatVND,
-} from '../../utils/format';
-import { mockAddresses, mockOrders } from '../../mocks/data';
+import { orderApi } from '../../api/orders';
+import { getErrorMessage } from '../../api/client';
+import { useApi } from '../../hooks/useApi';
+import { colors, radius, spacing, tagPalette } from '../../theme';
+import { ORDER_STATUS_COLOR, ORDER_STATUS_LABEL, formatDate, formatVND } from '../../utils/format';
 import type { RootStackParamList } from '../../navigation/types';
 import type { OrderStatus } from '../../types';
+
+type Nav = NativeStackNavigationProp<RootStackParamList>;
 
 // Ràng buộc lấy từ backend: chỉ hai trạng thái này mới huỷ được.
 const CANCELLABLE: OrderStatus[] = ['pending', 'simulated_success'];
 
 // Các mốc theo dõi đơn, khớp chuỗi trạng thái pending → paid → shipped.
-const TIMELINE: { status: OrderStatus; label: string; icon: keyof typeof Ionicons.glyphMap }[] = [
+const TIMELINE: { status: OrderStatus; label: string; icon: IoniconsIconName }[] = [
   { status: 'pending', label: 'Đã đặt hàng', icon: 'receipt-outline' },
   { status: 'paid', label: 'Đã thanh toán', icon: 'card-outline' },
   { status: 'shipped', label: 'Đang giao hàng', icon: 'car-outline' },
 ];
 
 export default function OrderDetailScreen() {
+  const navigation = useNavigation<Nav>();
   const { orderId } = useRoute<RouteProp<RootStackParamList, 'OrderDetail'>>().params;
-  const order = useMemo(() => mockOrders.find((o) => o.id === orderId), [orderId]);
-  const [cancelled, setCancelled] = useState(false);
+  const { data: order, loading, error, reload } = useApi(() => orderApi.detail(orderId), [orderId]);
+  const [cancelling, setCancelling] = useState(false);
 
   if (!order) {
     return (
       <Screen edges={[]}>
-        <Text style={styles.notFound}>Không tìm thấy đơn hàng.</Text>
+        <LoadState loading={loading} error={error} onRetry={reload} />
       </Screen>
     );
   }
 
-  const status = cancelled ? 'cancelled' : order.status;
+  const status = order.status;
   const reachedIndex = TIMELINE.findIndex((t) => t.status === status);
-  const address = mockAddresses.find((a) => a.is_default) ?? mockAddresses[0];
+  const address = order.shipping_address;
+
+  const cancel = async () => {
+    setCancelling(true);
+    try {
+      await orderApi.cancel(order.id);
+      reload();
+    } catch (err) {
+      Alert.alert('Không huỷ được đơn', getErrorMessage(err));
+    } finally {
+      setCancelling(false);
+    }
+  };
 
   const confirmCancel = () => {
-    Alert.alert('Huỷ đơn hàng', `Bạn chắc chắn muốn huỷ đơn ${order.id}?`, [
+    Alert.alert('Huỷ đơn hàng', `Bạn chắc chắn muốn huỷ đơn #${order.id.slice(0, 8).toUpperCase()}?`, [
       { text: 'Không', style: 'cancel' },
-      { text: 'Huỷ đơn', style: 'destructive', onPress: () => setCancelled(true) },
+      { text: 'Huỷ đơn', style: 'destructive', onPress: cancel },
     ]);
   };
 
@@ -64,7 +81,7 @@ export default function OrderDetailScreen() {
         <Card style={styles.card}>
           <View style={styles.statusHead}>
             <View style={styles.flex}>
-              <Text style={styles.orderId}>{order.id}</Text>
+              <Text style={styles.orderId}>#{order.id.slice(0, 8).toUpperCase()}</Text>
               <Text style={styles.date}>Đặt lúc {formatDate(order.created_at)}</Text>
             </View>
             <Tag label={ORDER_STATUS_LABEL[status]} color={ORDER_STATUS_COLOR[status]} />
@@ -110,37 +127,48 @@ export default function OrderDetailScreen() {
         </Card>
 
         {/* ---- Sản phẩm ---- */}
-        <Card title={`Sản phẩm (${order.items?.length ?? 0})`} style={styles.card}>
-          {order.items?.map((item, i) => (
-            <View key={item.id} style={[styles.itemRow, i > 0 && styles.itemRowBorder]}>
-              <ProductThumb uri={null} icon={item.product?.category?.icon} size={52} />
+        <Card title={`Sản phẩm (${order.items.length})`} style={styles.card}>
+          {order.items.map((item, i) => (
+            <View key={item.product.id} style={[styles.itemRow, i > 0 && styles.itemRowBorder]}>
+              <ProductThumb uri={item.product.image} icon={null} size={52} />
               <View style={styles.flex}>
                 <Text style={styles.itemName} numberOfLines={2}>
-                  {item.product?.name ?? 'Sản phẩm'}
+                  {item.product.name}
                 </Text>
+                {/* Backend trả giá HIỆN TẠI của sản phẩm, không phải giá lúc đặt. */}
                 <Text style={styles.itemQty}>
-                  {formatVND(item.unit_price)} × {item.quantity}
+                  {formatVND(item.product.price)} × {item.quantity}
                 </Text>
               </View>
-              <Text style={styles.itemTotal}>{formatVND(item.unit_price * item.quantity)}</Text>
+              <View style={styles.itemRight}>
+                <Text style={styles.itemTotal}>{formatVND(item.product.price * item.quantity)}</Text>
+                {/* Backend chỉ cho đánh giá sản phẩm trong đơn đã hoàn tất (status 'paid'). */}
+                {status === 'paid' ? (
+                  <Pressable
+                    accessibilityRole="button"
+                    onPress={() =>
+                      navigation.navigate('WriteReview', {
+                        productId: item.product.id,
+                        productName: item.product.name,
+                        productImage: item.product.image,
+                      })
+                    }
+                    hitSlop={6}
+                    style={styles.reviewLink}
+                  >
+                    <Ionicons name="create-outline" size={13} color={colors.primary} />
+                    <Text style={styles.reviewLinkText}>Đánh giá</Text>
+                  </Pressable>
+                ) : null}
+              </View>
             </View>
           ))}
         </Card>
 
         {/* ---- Thanh toán ---- */}
+        {/* Hình thức và trạng thái thanh toán không hiện được: GET /api/orders/:id
+            không trả kèm thông tin giao dịch. */}
         <Card title="Thanh toán" style={styles.card}>
-          {order.payment ? (
-            <View style={styles.payHead}>
-              <Text style={styles.payMethod}>
-                {order.payment.method === 'payos' ? 'Chuyển khoản / QR (PayOS)' : 'Thanh toán khi nhận hàng'}
-              </Text>
-              <Tag
-                label={PAYMENT_STATUS_LABEL[order.payment.status]}
-                color={PAYMENT_STATUS_COLOR[order.payment.status]}
-              />
-            </View>
-          ) : null}
-
           <SummaryRow label="Tạm tính" value={formatVND(order.subtotal)} />
           <SummaryRow
             label="Phí vận chuyển"
@@ -149,10 +177,14 @@ export default function OrderDetailScreen() {
           {order.discount_amount > 0 ? (
             <SummaryRow label="Giảm giá" value={`- ${formatVND(order.discount_amount)}`} highlight />
           ) : null}
-          <View style={styles.grandRow}>
-            <Text style={styles.grandLabel}>Tổng cộng</Text>
-            <Text style={styles.grandValue}>{formatVND(order.total)}</Text>
-          </View>
+          {order.shipping_discount_amount > 0 ? (
+            <SummaryRow
+              label="Giảm phí ship"
+              value={`- ${formatVND(order.shipping_discount_amount)}`}
+              highlight
+            />
+          ) : null}
+          <GrandTotalRow value={formatVND(order.total)} />
         </Card>
 
         {CANCELLABLE.includes(status) ? (
@@ -160,6 +192,7 @@ export default function OrderDetailScreen() {
             title="Huỷ đơn hàng"
             variant="danger"
             block
+            loading={cancelling}
             onPress={confirmCancel}
             style={styles.cancelBtn}
           />
@@ -169,19 +202,9 @@ export default function OrderDetailScreen() {
   );
 }
 
-function SummaryRow({ label, value, highlight }: { label: string; value: string; highlight?: boolean }) {
-  return (
-    <View style={styles.summaryRow}>
-      <Text style={styles.summaryLabel}>{label}</Text>
-      <Text style={[styles.summaryValue, highlight && styles.summaryValueHi]}>{value}</Text>
-    </View>
-  );
-}
-
 const styles = StyleSheet.create({
   flex: { flex: 1 },
   scroll: { padding: spacing.lg, paddingBottom: spacing.xxl, gap: spacing.md },
-  notFound: { padding: spacing.xl, color: colors.textMuted },
   card: { marginTop: 0 },
 
   statusHead: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md },
@@ -200,9 +223,9 @@ const styles = StyleSheet.create({
   },
   stepLineDone: { backgroundColor: colors.primary },
   stepIcon: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
+    width: 34,
+    height: 34,
+    borderRadius: 17,
     backgroundColor: colors.bg,
     alignItems: 'center',
     justifyContent: 'center',
@@ -217,8 +240,8 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
     marginTop: spacing.lg,
     padding: spacing.md,
-    borderRadius: radius.md,
-    backgroundColor: '#fff1f0',
+    borderRadius: radius.lg,
+    backgroundColor: tagPalette.red.bg,
   },
   cancelledText: { flex: 1, fontSize: 12.5, color: colors.textSecondary },
 
@@ -228,36 +251,12 @@ const styles = StyleSheet.create({
   itemRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingVertical: spacing.md },
   itemRowBorder: { borderTopWidth: 1, borderTopColor: colors.border },
   itemName: { fontSize: 13, color: colors.text, lineHeight: 18 },
+  itemRight: { alignItems: 'flex-end', gap: spacing.xs },
+  reviewLink: { flexDirection: 'row', alignItems: 'center', gap: 3 },
+  reviewLinkText: { fontSize: 12, fontWeight: '600', color: colors.primary },
   itemQty: { fontSize: 12, color: colors.textMuted, marginTop: 2 },
   itemTotal: { fontSize: 13.5, fontWeight: '700', color: colors.text },
 
-  payHead: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: spacing.md,
-    marginBottom: spacing.md,
-    paddingBottom: spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-  },
-  payMethod: { flex: 1, fontSize: 13.5, color: colors.text, fontWeight: '600' },
-
-  summaryRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 4 },
-  summaryLabel: { fontSize: 13.5, color: colors.textSecondary },
-  summaryValue: { fontSize: 13.5, color: colors.text, fontWeight: '600' },
-  summaryValueHi: { color: colors.success },
-  grandRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'baseline',
-    marginTop: spacing.md,
-    paddingTop: spacing.md,
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
-  },
-  grandLabel: { fontSize: 15, fontWeight: '700', color: colors.text },
-  grandValue: { fontSize: 19, fontWeight: '800', color: colors.primary },
 
   cancelBtn: { marginTop: spacing.sm },
 });
