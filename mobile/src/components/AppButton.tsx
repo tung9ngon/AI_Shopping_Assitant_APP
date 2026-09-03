@@ -1,8 +1,12 @@
 import { ActivityIndicator, Pressable, StyleSheet, Text, View, type ViewStyle } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons, { type IoniconsIconName } from '@react-native-vector-icons/ionicons/static';
 import { colors, radius, spacing } from '../theme';
 
 type Variant = 'primary' | 'outline' | 'ghost' | 'danger';
+
+// Màn hình nào phải tự chừa chỗ cho nút (thanh hành động cố định ở đáy) thì lấy số
+// này thay vì chép lại — đổi chiều cao nút ở đây là mọi nơi theo đúng.
+export const BUTTON_HEIGHT = 50;
 
 export default function AppButton({
   title,
@@ -17,7 +21,7 @@ export default function AppButton({
   title: string;
   onPress?: () => void;
   variant?: Variant;
-  icon?: keyof typeof Ionicons.glyphMap;
+  icon?: IoniconsIconName;
   disabled?: boolean;
   loading?: boolean;
   block?: boolean;
@@ -32,6 +36,8 @@ export default function AppButton({
       style={({ pressed }) => [
         styles.base,
         variantStyle[variant],
+        // Chỉ nút nền đặc mới đổ bóng; nút viền/nền nhạt đổ bóng trông như bị nhoè.
+        variant === 'primary' && !inert && styles.primaryShadow,
         block && styles.block,
         inert && styles.disabled,
         pressed && !inert && styles.pressed,
@@ -66,15 +72,22 @@ const variantStyle: Record<Variant, ViewStyle> = {
 
 const styles = StyleSheet.create({
   base: {
-    minHeight: 46,
+    minHeight: BUTTON_HEIGHT,
     paddingHorizontal: spacing.lg,
-    borderRadius: radius.md,
+    borderRadius: radius.lg,
     alignItems: 'center',
     justifyContent: 'center',
   },
+  primaryShadow: {
+    shadowColor: colors.primaryDark,
+    shadowOpacity: 0.22,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 4,
+  },
   block: { alignSelf: 'stretch' },
   content: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  label: { fontSize: 15, fontWeight: '600' },
+  label: { fontSize: 15, fontWeight: '700' },
   disabled: { opacity: 0.45 },
-  pressed: { opacity: 0.75 },
+  pressed: { opacity: 0.85, transform: [{ scale: 0.98 }] },
 });

@@ -20,6 +20,7 @@ import { AdminOrderModule } from './admin/order/order.admin.module';
 import { PaymentModule } from './users/payment/payment.module';
 import { AdminPaymentModule } from './admin/payment/payment.admin.module';
 import { ChatModule } from './users/chat/chat.module';
+import { ConversationModule } from './users/conversation/conversation.module';
 import { AddressModule } from './users/address/address.module'
 import { ProfileModule } from './users/profile/profile.module';
 import { AdminStatisticsModule } from './admin/statistics/statistics.admin.module';
@@ -68,6 +69,7 @@ import { AdminStatisticsModule } from './admin/statistics/statistics.admin.modul
     AdminPaymentModule,
     AdminProductModule,
     ChatModule,
+    ConversationModule,
     AddressModule,
     ProfileModule,
     AdminStatisticsModule,

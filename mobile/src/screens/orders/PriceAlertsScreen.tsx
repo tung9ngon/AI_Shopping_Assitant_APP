@@ -1,28 +1,32 @@
-// UC-ALERT-02 — Quản lý danh sách cảnh báo giá.
+// UC-ALERT-02 — Quản lý danh sách cảnh báo giá (GET/DELETE /api/price-alerts).
 //
 // Bản web chỉ báo được qua email (cron quét mỗi 30 giây rồi gửi mail), có thể vài ngày
 // sau người dùng mới đọc. Trên app, kênh 'app' của bảng notifications mới dùng được —
 // phần đẩy thông báo thuộc UC-MOB-01, làm ở vòng sau.
 import { useState } from 'react';
 import { Alert, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@react-native-vector-icons/ionicons/static';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
 import Screen from '../../components/Screen';
 import EmptyState from '../../components/EmptyState';
+import LoadState from '../../components/LoadState';
 import ProductThumb from '../../components/ProductThumb';
 import Tag from '../../components/Tag';
+import { priceAlertApi } from '../../api/priceAlerts';
+import { getErrorMessage } from '../../api/client';
+import { useApi } from '../../hooks/useApi';
 import { colors, radius, shadow, spacing } from '../../theme';
 import { formatVND } from '../../utils/format';
-import { mockPriceAlerts } from '../../mocks/data';
 import type { RootStackParamList } from '../../navigation/types';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
 export default function PriceAlertsScreen() {
   const navigation = useNavigation<Nav>();
-  const [alerts, setAlerts] = useState(mockPriceAlerts);
+  const alerts = useApi(() => priceAlertApi.list(), []);
+  const [removing, setRemoving] = useState(false);
 
   const removeAlert = (id: string) => {
     Alert.alert('Xoá cảnh báo', 'Bạn sẽ không được báo khi sản phẩm này giảm giá nữa.', [
@@ -30,10 +34,32 @@ export default function PriceAlertsScreen() {
       {
         text: 'Xoá',
         style: 'destructive',
-        onPress: () => setAlerts((prev) => prev.filter((a) => a.id !== id)),
+        onPress: async () => {
+          if (removing) return;
+          setRemoving(true);
+          try {
+            await priceAlertApi.remove(id);
+            alerts.reload();
+          } catch (err) {
+            Alert.alert('Không xoá được cảnh báo', getErrorMessage(err));
+          } finally {
+            setRemoving(false);
+          }
+        },
       },
     ]);
   };
+
+  if (!alerts.data) {
+    return (
+      <Screen edges={[]}>
+        <LoadState loading={alerts.loading} error={alerts.error} onRetry={alerts.reload} />
+      </Screen>
+    );
+  }
+
+  // Backend xoá mềm: bản ghi đã huỷ vẫn nằm trong danh sách trả về.
+  const items = alerts.data.filter((a) => a.status !== 'cancelled');
 
   return (
     <Screen edges={[]}>
@@ -45,8 +71,10 @@ export default function PriceAlertsScreen() {
       </View>
 
       <FlatList
-        data={alerts}
+        data={items}
         keyExtractor={(a) => a.id}
+        refreshing={alerts.loading}
+        onRefresh={alerts.reload}
         contentContainerStyle={styles.list}
         showsVerticalScrollIndicator={false}
         ListEmptyComponent={
@@ -59,23 +87,22 @@ export default function PriceAlertsScreen() {
           />
         }
         renderItem={({ item }) => {
-          const current = Number(item.product?.price ?? 0);
+          const current = item.product.price;
           const gap = current - item.target_price;
-          const reached = gap <= 0;
+          // 'triggered' là kết luận của backend; `gap <= 0` chỉ là giá đọc lúc này.
+          const reached = item.status === 'triggered' || gap <= 0;
 
           return (
             <Pressable
               accessibilityRole="button"
-              onPress={() =>
-                item.product ? navigation.navigate('ProductDetail', { productId: item.product.id }) : undefined
-              }
+              onPress={() => navigation.navigate('ProductDetail', { productId: item.product.id })}
               style={styles.card}
             >
-              <ProductThumb uri={null} icon={item.product?.category?.icon} size={60} />
+              <ProductThumb uri={item.product.image} icon={null} size={60} />
 
               <View style={styles.body}>
                 <Text style={styles.name} numberOfLines={2}>
-                  {item.product?.name ?? 'Sản phẩm'}
+                  {item.product.name}
                 </Text>
 
                 <View style={styles.priceRow}>
@@ -108,12 +135,17 @@ export default function PriceAlertsScreen() {
 }
 
 const styles = StyleSheet.create({
+  // Thẻ nhắc việc, không phải dải kẻ ngang suốt màn — cùng lối với thanh miễn phí
+  // vận chuyển ở màn Giỏ hàng.
   banner: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
+    marginHorizontal: spacing.lg,
+    marginTop: spacing.lg,
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
+    borderRadius: radius.lg,
     backgroundColor: colors.primarySoft,
   },
   bannerText: { flex: 1, fontSize: 12.5, color: colors.textSecondary, lineHeight: 18 },
@@ -125,7 +157,7 @@ const styles = StyleSheet.create({
     gap: spacing.md,
     padding: spacing.md,
     backgroundColor: colors.surface,
-    borderRadius: radius.lg,
+    borderRadius: radius.xl,
     ...shadow.card,
   },
   body: { flex: 1, gap: spacing.xs },

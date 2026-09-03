@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { StyleSheet, Text, TextInput, View, type TextInputProps } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons, { type IoniconsIconName } from '@react-native-vector-icons/ionicons/static';
 import { colors, radius, spacing } from '../theme';
 
 export default function TextField({
@@ -11,7 +11,7 @@ export default function TextField({
   ...rest
 }: TextInputProps & {
   label?: string;
-  icon?: keyof typeof Ionicons.glyphMap;
+  icon?: IoniconsIconName;
   error?: string;
 }) {
   const [focused, setFocused] = useState(false);
@@ -41,27 +41,34 @@ export default function TextField({
           }}
         />
       </View>
-      {error ? <Text style={styles.error}>{error}</Text> : null}
+      {/* liveRegion: TalkBack đọc lỗi ngay khi nó xuất hiện, không chỉ hiện thị giác */}
+      {error ? (
+        <Text style={styles.error} accessibilityLiveRegion="polite">
+          {error}
+        </Text>
+      ) : null}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   wrap: { gap: spacing.xs },
-  label: { fontSize: 13, fontWeight: '600', color: colors.textSecondary },
+  label: { fontSize: 13, fontWeight: '600', color: colors.textSecondary, marginLeft: 2 },
   box: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
-    backgroundColor: colors.surface,
+    backgroundColor: colors.surfaceAlt,
     borderWidth: 1,
     borderColor: colors.border,
-    borderRadius: radius.md,
+    borderRadius: radius.lg,
     paddingHorizontal: spacing.md,
-    minHeight: 46,
+    minHeight: 50,
   },
-  boxFocused: { borderColor: colors.primary },
+  // Đang gõ thì ô sáng lên (nền trắng) chứ không chỉ đổi màu viền — viền 1px trên
+  // màn hình điện thoại là tín hiệu quá nhỏ.
+  boxFocused: { borderColor: colors.primary, backgroundColor: colors.surface },
   boxError: { borderColor: colors.danger },
   input: { flex: 1, fontSize: 15, color: colors.text, paddingVertical: spacing.sm },
-  error: { fontSize: 12, color: colors.danger },
+  error: { fontSize: 12, color: colors.danger, marginLeft: 2 },
 });

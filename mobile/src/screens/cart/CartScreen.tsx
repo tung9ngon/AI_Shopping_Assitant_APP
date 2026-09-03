@@ -1,6 +1,8 @@
-// UC-CART-02 — Quản lý giỏ hàng.
-import { StyleSheet, Text, View, FlatList, Pressable } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+// UC-CART-02 — Quản lý giỏ hàng (/api/cart).
+//
+// Giỏ nằm trên máy chủ và gắn với tài khoản, nên chưa đăng nhập là chưa có giỏ.
+import { Alert, StyleSheet, Text, View, FlatList, Pressable } from 'react-native';
+import Ionicons from '@react-native-vector-icons/ionicons/static';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
@@ -9,20 +11,75 @@ import AppButton from '../../components/AppButton';
 import EmptyState from '../../components/EmptyState';
 import ProductThumb from '../../components/ProductThumb';
 import QuantityStepper from '../../components/QuantityStepper';
+import LoadState from '../../components/LoadState';
+import { GrandTotalRow, SummaryRow } from '../../components/OrderSummary';
+import { useAuth } from '../../context/AuthContext';
 import { useCart } from '../../context/CartContext';
+import { getErrorMessage } from '../../api/client';
 import { colors, radius, shadow, spacing } from '../../theme';
 import { formatVND } from '../../utils/format';
-import { FREE_SHIPPING_THRESHOLD, SHIPPING_FEE, productIcon } from '../../mocks/data';
+import { FREE_SHIPPING_THRESHOLD } from '../../constants';
+import { baseShippingFee } from '../../utils/discount';
 import type { RootStackParamList } from '../../navigation/types';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
 export default function CartScreen() {
   const navigation = useNavigation<Nav>();
-  const { cart, updateQuantity, remove } = useCart();
+  const { isAuthenticated, restoring } = useAuth();
+  const { cart, updateQuantity, remove, loading, error, reload } = useCart();
 
-  const freeShip = cart.subtotal >= FREE_SHIPPING_THRESHOLD;
+  const shippingFee = baseShippingFee(cart.subtotal);
+  const freeShip = shippingFee === 0;
   const missingForFreeShip = FREE_SHIPPING_THRESHOLD - cart.subtotal;
+  const shipProgress = Math.min(1, cart.subtotal / FREE_SHIPPING_THRESHOLD);
+
+  // Mọi thao tác đều gọi API rồi tải lại giỏ — hỏng thì phải báo, không nuốt lỗi.
+  const guard = async (action: () => Promise<void>) => {
+    try {
+      await action();
+    } catch (err) {
+      Alert.alert('Chưa cập nhật được giỏ hàng', getErrorMessage(err));
+    }
+  };
+
+  // Lúc app còn đang khôi phục phiên (GET /users/me chưa về) thì chưa biết đã đăng
+  // nhập hay chưa — hiện chờ, đừng vội chìa màn "chưa đăng nhập".
+  if (restoring) {
+    return (
+      <Screen>
+        <Header count={0} />
+        <LoadState loading error={null} onRetry={reload} />
+      </Screen>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return (
+      <Screen>
+        <Header count={0} />
+        <EmptyState
+          icon="person-outline"
+          title="Bạn chưa đăng nhập"
+          description="Giỏ hàng gắn với tài khoản của bạn. Đăng nhập để xem và mua hàng."
+          actionTitle="Đăng nhập"
+          onAction={() => navigation.navigate('Login')}
+        />
+      </Screen>
+    );
+  }
+
+  // Chỉ chiếm cả màn khi CHƯA có gì để hiện (lượt tải đầu). Các lượt reload nền sau
+  // add/update/remove cũng bật `loading`, nhưng lúc đó danh sách phải đứng yên —
+  // unmount list giữa chừng là mất vị trí cuộn và nuốt cú bấm stepper tiếp theo.
+  if ((loading || error) && cart.items.length === 0) {
+    return (
+      <Screen>
+        <Header count={0} />
+        <LoadState loading={loading} error={error} onRetry={reload} />
+      </Screen>
+    );
+  }
 
   if (cart.items.length === 0) {
     return (
@@ -31,7 +88,7 @@ export default function CartScreen() {
         <EmptyState
           icon="cart-outline"
           title="Giỏ hàng đang trống"
-          description="Bạn chưa thêm sản phẩm nào. Ghé xem hàng mới về hoặc hỏi trợ lý AI xem nên mua gì."
+          description="Ghé xem hàng mới về, hoặc hỏi trợ lý xem nên mua gì."
           actionTitle="Xem sản phẩm"
           onAction={() => navigation.navigate('Tabs', { screen: 'Products' })}
         />
@@ -45,16 +102,27 @@ export default function CartScreen() {
 
       {/* Ngưỡng miễn phí ship — quy tắc lấy từ BE/src/users/order/order.service.ts */}
       <View style={[styles.shipBar, freeShip && styles.shipBarOk]}>
-        <Ionicons
-          name={freeShip ? 'checkmark-circle' : 'car-outline'}
-          size={16}
-          color={freeShip ? colors.success : colors.primary}
-        />
-        <Text style={styles.shipText}>
-          {freeShip
-            ? 'Đơn của bạn được miễn phí vận chuyển'
-            : `Mua thêm ${formatVND(missingForFreeShip)} để được miễn phí vận chuyển`}
-        </Text>
+        <View style={styles.shipRow}>
+          <Ionicons
+            name={freeShip ? 'checkmark-circle' : 'car-outline'}
+            size={16}
+            color={freeShip ? colors.success : colors.primary}
+          />
+          <Text style={styles.shipText}>
+            {freeShip
+              ? 'Đơn của bạn được miễn phí vận chuyển'
+              : `Mua thêm ${formatVND(missingForFreeShip)} để được miễn phí vận chuyển`}
+          </Text>
+        </View>
+        <View style={styles.shipTrack}>
+          <View
+            style={[
+              styles.shipFill,
+              { width: `${shipProgress * 100}%` },
+              freeShip && styles.shipFillOk,
+            ]}
+          />
+        </View>
       </View>
 
       <FlatList
@@ -64,7 +132,9 @@ export default function CartScreen() {
         showsVerticalScrollIndicator={false}
         renderItem={({ item }) => (
           <View style={styles.row}>
-            <ProductThumb uri={item.product.image} icon={productIcon(item.product.id)} size={72} />
+            <View style={styles.thumbBox}>
+              <ProductThumb uri={item.product.image} size={72} style={styles.thumb} />
+            </View>
             <View style={styles.rowBody}>
               <Text style={styles.name} numberOfLines={2}>
                 {item.product.name}
@@ -73,13 +143,14 @@ export default function CartScreen() {
               <View style={styles.rowActions}>
                 <QuantityStepper
                   value={item.quantity}
-                  onChange={(q) => updateQuantity(item.id, q)}
+                  onChange={(q) => guard(() => updateQuantity(item.id, q))}
                 />
                 <Pressable
                   accessibilityRole="button"
                   accessibilityLabel={`Xoá ${item.product.name} khỏi giỏ`}
-                  onPress={() => remove(item.id)}
+                  onPress={() => guard(() => remove(item.id))}
                   hitSlop={8}
+                  style={({ pressed }) => [styles.removeBtn, pressed && styles.removeBtnPressed]}
                 >
                   <Ionicons name="trash-outline" size={18} color={colors.textMuted} />
                 </Pressable>
@@ -91,16 +162,15 @@ export default function CartScreen() {
 
       {/* ---- Thanh tổng tiền ---- */}
       <View style={styles.footer}>
-        <View style={styles.totalRow}>
-          <Text style={styles.totalLabel}>Tạm tính</Text>
-          <Text style={styles.totalValue}>{formatVND(cart.subtotal)}</Text>
-        </View>
-        <View style={styles.totalRow}>
-          <Text style={styles.totalLabel}>Phí vận chuyển</Text>
-          <Text style={styles.shipValue}>
-            {freeShip ? 'Miễn phí' : formatVND(SHIPPING_FEE)}
-          </Text>
-        </View>
+        <SummaryRow label="Tạm tính" value={formatVND(cart.subtotal)} />
+        <SummaryRow
+          label="Phí vận chuyển"
+          value={freeShip ? 'Miễn phí' : formatVND(shippingFee)}
+          highlight={freeShip}
+        />
+        {/* Số hiện trước cho người mua ước lượng; tiền thật do backend chốt lúc đặt
+            hàng, sau khi trừ mã giảm giá chọn ở màn Đặt hàng. */}
+        <GrandTotalRow value={formatVND(cart.subtotal + shippingFee)} />
         <AppButton
           title="Tiến hành đặt hàng"
           block
@@ -127,22 +197,34 @@ const styles = StyleSheet.create({
     alignItems: 'baseline',
     gap: spacing.sm,
     paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
-    backgroundColor: colors.surface,
+    paddingTop: spacing.md,
+    paddingBottom: spacing.sm,
   },
-  headerTitle: { fontSize: 20, fontWeight: '700', color: colors.text },
+  headerTitle: { fontSize: 24, fontWeight: '800', color: colors.text, letterSpacing: -0.5 },
   headerCount: { fontSize: 13, color: colors.textMuted },
 
+  // Thanh tiến độ miễn phí ship là một thẻ nổi, không phải dải kẻ ngang suốt màn:
+  // nó là thông tin của giỏ hàng này, không phải thanh trạng thái của cả trang.
   shipBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
     gap: spacing.sm,
+    marginHorizontal: spacing.lg,
+    marginBottom: spacing.xs,
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
+    borderRadius: radius.lg,
     backgroundColor: colors.primarySoft,
   },
-  shipBarOk: { backgroundColor: '#f6ffed' },
+  shipBarOk: { backgroundColor: '#f0fbe8' },
+  shipRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   shipText: { flex: 1, fontSize: 12.5, color: colors.textSecondary, fontWeight: '600' },
+  shipTrack: {
+    height: 5,
+    borderRadius: radius.pill,
+    backgroundColor: colors.surface,
+    overflow: 'hidden',
+  },
+  shipFill: { height: 5, borderRadius: radius.pill, backgroundColor: colors.primary },
+  shipFillOk: { backgroundColor: colors.success },
 
   list: { padding: spacing.lg, gap: spacing.md },
   row: {
@@ -150,9 +232,11 @@ const styles = StyleSheet.create({
     gap: spacing.md,
     padding: spacing.md,
     backgroundColor: colors.surface,
-    borderRadius: radius.lg,
+    borderRadius: radius.xl,
     ...shadow.card,
   },
+  thumbBox: { backgroundColor: colors.surfaceAlt, borderRadius: radius.lg, overflow: 'hidden' },
+  thumb: { borderRadius: radius.lg },
   rowBody: { flex: 1, gap: spacing.xs },
   name: { fontSize: 13.5, color: colors.text, lineHeight: 19 },
   price: { fontSize: 15, fontWeight: '700', color: colors.primary },
@@ -162,17 +246,14 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginTop: spacing.xs,
   },
+  removeBtn: { padding: 6, borderRadius: radius.md },
+  removeBtnPressed: { backgroundColor: colors.bg },
 
   footer: {
     padding: spacing.lg,
-    paddingBottom: spacing.xl,
     backgroundColor: colors.surface,
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
+    borderTopLeftRadius: radius.xl,
+    borderTopRightRadius: radius.xl,
     ...shadow.raised,
   },
-  totalRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 3 },
-  totalLabel: { fontSize: 14, color: colors.textSecondary },
-  totalValue: { fontSize: 16, fontWeight: '700', color: colors.text },
-  shipValue: { fontSize: 14, fontWeight: '600', color: colors.success },
 });

@@ -1,4 +1,5 @@
 import { Injectable, BadRequestException, UnauthorizedException, ConflictException } from '@nestjs/common';
+import { randomBytes } from 'crypto';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { JwtService } from '@nestjs/jwt';
@@ -187,6 +188,25 @@ export class AuthService {
       await this.userRepo.save(user);
     }
 
+    return user;
+  }
+
+  // Mã một lần cho OAuth trên mobile: cookie không đi qua được chuỗi redirect của
+  // trình duyệt về app, nên callback phát mã ngắn hạn, app đổi mã lấy cookie qua
+  // POST /auth/oauth/exchange.
+  async createOAuthCode(userId: string) {
+    const code = randomBytes(32).toString('hex');
+    await this.redis.set(`oauth_code:${code}`, userId, 60); // TTL 60 giây, dùng 1 lần
+    return code;
+  }
+
+  async exchangeOAuthCode(code: string) {
+    const userId = await this.redis.get(`oauth_code:${code}`);
+    if (!userId) throw new UnauthorizedException('Mã đăng nhập không hợp lệ hoặc đã hết hạn');
+    await this.redis.del(`oauth_code:${code}`);
+
+    const user = await this.userRepo.findOne({ where: { id: userId } });
+    if (!user) throw new UnauthorizedException('Phiên không hợp lệ');
     return user;
   }
 

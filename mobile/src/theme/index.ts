@@ -1,4 +1,4 @@
-import { Platform } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 // Design token cho ứng dụng di động.
 //
@@ -28,6 +28,17 @@ export const colors = {
   info: '#1677ff',
 } as const;
 
+// Dải chuyển sắc. React Native không vẽ được gradient bằng style; component
+// components/Gradient.tsx dựng lại bằng react-native-svg từ các dải khai ở đây.
+export const gradient = {
+  // Nhận diện: cam sáng -> cam thương hiệu -> cam đậm. Dùng cho đầu trang chủ.
+  brand: ['#ff9d4d', '#f26d21', '#e35410'],
+  // Nền rất nhạt cho ô biểu tượng, huy hiệu — chữ đen vẫn đọc được trên nền này.
+  brandSoft: ['#fff4ec', '#ffe4d1'],
+  // Báo thành công (đặt hàng xong, thanh toán xong).
+  success: ['#73d13d', '#389e0d'],
+} as const;
+
 // utils/format.ts (copy từ web) trả về tên màu của Ant Design Tag — 'gold', 'cyan'…
 // React Native không có hệ màu theo tên, nên ánh xạ sang cặp nền/chữ tại đây.
 export const tagPalette: Record<string, { bg: string; fg: string }> = {
@@ -40,9 +51,20 @@ export const tagPalette: Record<string, { bg: string; fg: string }> = {
   default: { bg: '#fafafa', fg: '#595959' },
 };
 
-// Chiều cao thanh tab. Khai ở đây vì các màn hình nằm trong tab phải tự chừa đúng
-// khoảng này ở cuối nội dung, nếu không phần cuối trang bị thanh tab che mất.
-export const tabBarHeight = Platform.OS === 'ios' ? 90 : 76;
+// Chiều cao thanh tab = phần nội dung cố định + inset đáy của từng máy (home
+// indicator iPhone, thanh gesture Android edge-to-edge). Không hardcode inset:
+// Android 16 buộc edge-to-edge nên số cứng sẽ bị thanh gesture đè lên, còn iPhone
+// không có home indicator thì thừa 30px trống.
+// Phần nội dung: icon 24 + nhãn 17 + paddingTop 6 + đệm ~13 (xem chú thích tabBar
+// ở navigation/index.tsx — tối thiểu 51 để nhãn tiếng Việt không mất chân dấu).
+export const tabBarContentHeight = 60;
+
+// Dùng cho cả thanh tab lẫn các màn hình trong tab (phải chừa đúng khoảng này ở
+// cuối nội dung, nếu không phần cuối trang bị thanh tab che mất).
+export function useTabBarHeight(): number {
+  const insets = useSafeAreaInsets();
+  return tabBarContentHeight + Math.max(insets.bottom, 8);
+}
 
 export const spacing = {
   xs: 4,
@@ -86,5 +108,14 @@ export const shadow = {
     shadowRadius: 16,
     shadowOffset: { width: 0, height: -2 },
     elevation: 8,
+  },
+  // Bóng của khối nổi hẳn lên khỏi nền (thẻ đè lên đầu trang, thanh tìm kiếm trên
+  // nền cam). Đổ xuống xa hơn `card` để thấy rõ khoảng cách giữa hai lớp.
+  float: {
+    shadowColor: '#7a2f00',
+    shadowOpacity: 0.16,
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 6,
   },
 } as const;

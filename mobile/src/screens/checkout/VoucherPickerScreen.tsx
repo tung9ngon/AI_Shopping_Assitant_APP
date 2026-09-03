@@ -3,66 +3,90 @@
 // Backend cho một đơn áp tối đa 2 mã: 1 mã giảm tiền hàng (category 'order') và
 // 1 mã miễn phí ship (category 'free_shipping'). Màn hình chia đúng thành hai nhóm,
 // mỗi nhóm chọn được một mã — thay vì bắt người dùng gõ tay mã trên bàn phím điện thoại.
+//
+// Hai nhóm nằm ở hai endpoint riêng (/discount-codes và /discount-codes/freeship) nên
+// lấy cả hai một lượt.
 import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@react-native-vector-icons/ionicons/static';
 import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
 import Screen from '../../components/Screen';
 import AppButton from '../../components/AppButton';
+import LoadState from '../../components/LoadState';
+import { discountApi, type DiscountCodeItem } from '../../api/discounts';
+import { useApi } from '../../hooks/useApi';
 import { colors, radius, shadow, spacing } from '../../theme';
 import { formatVND, formatDateShort } from '../../utils/format';
-import { mockVouchers } from '../../mocks/data';
-import { computeDiscount } from './CheckoutScreen';
+import { baseShippingFee, computeDiscount } from '../../utils/discount';
 import type { RootStackParamList } from '../../navigation/types';
-import type { DiscountCode } from '../../types';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
 export default function VoucherPickerScreen() {
   const navigation = useNavigation<Nav>();
-  const { subtotal, orderVoucherId, shipVoucherId } =
+  const { subtotal, orderVoucherCode, shipVoucherCode } =
     useRoute<RouteProp<RootStackParamList, 'VoucherPicker'>>().params;
 
-  const [pickedOrder, setPickedOrder] = useState<string | null>(orderVoucherId);
-  const [pickedShip, setPickedShip] = useState<string | null>(shipVoucherId);
+  const [pickedOrder, setPickedOrder] = useState<string | null>(orderVoucherCode);
+  const [pickedShip, setPickedShip] = useState<string | null>(shipVoucherCode);
 
-  const orderVouchers = mockVouchers.filter((v) => v.category === 'order');
-  const shipVouchers = mockVouchers.filter((v) => v.category === 'free_shipping');
+  const vouchers = useApi(
+    () => Promise.all([discountApi.listOrderCodes(), discountApi.listFreeshipCodes()]),
+    [],
+  );
 
+  // Trả về NGUYÊN OBJECT mã đã chọn (không chỉ code): Checkout cần loại giảm/mức giảm
+  // để tính bản xem trước, và đã có sẵn ở đây thì không bắt nó tải lại danh sách.
   const apply = () => {
+    const [orderList, shipList] = vouchers.data ?? [[], []];
     navigation.navigate({
       name: 'Checkout',
-      params: { orderVoucherId: pickedOrder, shipVoucherId: pickedShip },
+      params: {
+        orderVoucher: orderList.find((v) => v.code === pickedOrder) ?? null,
+        shipVoucher: shipList.find((v) => v.code === pickedShip) ?? null,
+      },
       merge: true,
     });
   };
+
+  if (!vouchers.data) {
+    return (
+      <Screen edges={[]}>
+        <LoadState loading={vouchers.loading} error={vouchers.error} onRetry={vouchers.reload} />
+      </Screen>
+    );
+  }
+
+  const [orderVouchers, shipVouchers] = vouchers.data;
 
   return (
     <Screen edges={[]}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
         <Text style={styles.groupTitle}>Mã giảm tiền hàng</Text>
         <Text style={styles.groupHint}>Chọn tối đa 1 mã</Text>
+        {orderVouchers.length === 0 ? <Text style={styles.empty}>Chưa có mã nào.</Text> : null}
         {orderVouchers.map((v) => (
           <VoucherRow
-            key={v.id}
+            key={v.code}
             voucher={v}
             subtotal={subtotal}
-            selected={pickedOrder === v.id}
-            onToggle={() => setPickedOrder(pickedOrder === v.id ? null : v.id)}
+            selected={pickedOrder === v.code}
+            onToggle={() => setPickedOrder(pickedOrder === v.code ? null : v.code)}
           />
         ))}
 
         <Text style={[styles.groupTitle, styles.groupTitleGap]}>Mã miễn phí vận chuyển</Text>
         <Text style={styles.groupHint}>Chọn tối đa 1 mã</Text>
+        {shipVouchers.length === 0 ? <Text style={styles.empty}>Chưa có mã nào.</Text> : null}
         {shipVouchers.map((v) => (
           <VoucherRow
-            key={v.id}
+            key={v.code}
             voucher={v}
             subtotal={subtotal}
-            selected={pickedShip === v.id}
-            onToggle={() => setPickedShip(pickedShip === v.id ? null : v.id)}
+            selected={pickedShip === v.code}
+            onToggle={() => setPickedShip(pickedShip === v.code ? null : v.code)}
           />
         ))}
       </ScrollView>
@@ -89,7 +113,7 @@ function VoucherRow({
   selected,
   onToggle,
 }: {
-  voucher: DiscountCode;
+  voucher: DiscountCodeItem;
   subtotal: number;
   selected: boolean;
   onToggle: () => void;
@@ -97,7 +121,10 @@ function VoucherRow({
   // Chưa đạt giá trị đơn tối thiểu thì mã hiển thị mờ và không bấm được.
   const shortfall = (voucher.min_order_value ?? 0) - subtotal;
   const usable = shortfall <= 0;
-  const saving = computeDiscount(voucher, subtotal);
+  // Mã freeship tính trên phí ship thực tế của đơn (0 nếu đã đạt ngưỡng miễn ship) —
+  // "Tiết kiệm" mới không phóng đại quá số tiền ship thật.
+  const shippingFee = voucher.category === 'free_shipping' ? baseShippingFee(subtotal) : null;
+  const saving = computeDiscount(voucher, subtotal, shippingFee);
 
   return (
     <Pressable
@@ -127,12 +154,9 @@ function VoucherRow({
           <Text style={styles.shortfall}>Mua thêm {formatVND(shortfall)} để dùng mã này</Text>
         )}
 
-        <Text style={styles.expiry}>
-          HSD {formatDateShort(voucher.valid_until)}
-          {voucher.usage_limit != null
-            ? ` · còn ${voucher.usage_limit - (voucher.used_count ?? 0)} lượt`
-            : ''}
-        </Text>
+        {/* Số lượt còn lại không hiển thị được: danh sách của backend không trả về
+            usage_limit / used_count. */}
+        <Text style={styles.expiry}>HSD {formatDateShort(voucher.valid_until)}</Text>
       </View>
 
       <Ionicons
@@ -150,6 +174,7 @@ const styles = StyleSheet.create({
   groupTitle: { fontSize: 15, fontWeight: '700', color: colors.text },
   groupTitleGap: { marginTop: spacing.xl },
   groupHint: { fontSize: 12, color: colors.textMuted, marginTop: 2, marginBottom: spacing.md },
+  empty: { fontSize: 13, color: colors.textMuted, marginBottom: spacing.md },
 
   row: {
     flexDirection: 'row',
@@ -158,17 +183,19 @@ const styles = StyleSheet.create({
     padding: spacing.md,
     marginBottom: spacing.md,
     backgroundColor: colors.surface,
-    borderRadius: radius.lg,
+    borderRadius: radius.xl,
+    // Viền trong suốt khi chưa chọn: giữ nguyên kích thước thẻ để lúc chọn viền hiện
+    // ra mà nội dung không bị đẩy lệch đi 1px.
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: 'transparent',
     ...shadow.card,
   },
-  rowSelected: { borderColor: colors.primary },
+  rowSelected: { borderColor: colors.primary, backgroundColor: colors.primarySoft },
   rowDisabled: { opacity: 0.5 },
   stub: {
-    width: 46,
-    height: 46,
-    borderRadius: radius.md,
+    width: 50,
+    height: 50,
+    borderRadius: radius.lg,
     backgroundColor: colors.primarySoft,
     alignItems: 'center',
     justifyContent: 'center',
@@ -191,8 +218,8 @@ const styles = StyleSheet.create({
     padding: spacing.lg,
     paddingBottom: spacing.xl,
     backgroundColor: colors.surface,
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
+    borderTopLeftRadius: radius.xl,
+    borderTopRightRadius: radius.xl,
     ...shadow.raised,
   },
 });

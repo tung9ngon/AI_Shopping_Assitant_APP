@@ -61,3 +61,9 @@ export class ResetPasswordDto {
   @Matches(PASSWORD_REGEX, { message: PASSWORD_MESSAGE })
   new_password: string;
 }
+
+export class OAuthExchangeDto {
+  @IsString()
+  @Length(64, 64)
+  code: string;
+}

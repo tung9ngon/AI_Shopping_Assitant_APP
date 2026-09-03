@@ -1,27 +1,24 @@
 // Trang tài khoản — cửa vào các chức năng cá nhân.
 import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons, { type IoniconsIconName } from '@react-native-vector-icons/ionicons/static';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
 import Screen from '../../components/Screen';
 import AppButton from '../../components/AppButton';
+import LoadState from '../../components/LoadState';
+import Gradient from '../../components/Gradient';
 import { useAuth } from '../../context/AuthContext';
-import { colors, radius, shadow, spacing, tabBarHeight } from '../../theme';
-import { formatDateShort } from '../../utils/format';
+import { colors, gradient, radius, shadow, spacing, useTabBarHeight } from '../../theme';
+import { avatarInitial, formatDateShort } from '../../utils/format';
 import type { RootStackParamList } from '../../navigation/types';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
 // Tên người Việt xếp họ trước, tên gọi sau — chữ đại diện lấy chữ đầu của từ cuối
 // ("Nguyễn Thanh Tùng" -> "T").
-function avatarInitial(fullName: string): string {
-  const parts = fullName.trim().split(/\s+/);
-  return (parts[parts.length - 1]?.[0] ?? '?').toUpperCase();
-}
-
 type MenuItem = {
-  icon: keyof typeof Ionicons.glyphMap;
+  icon: IoniconsIconName;
   label: string;
   hint?: string;
   onPress?: () => void;
@@ -30,15 +27,26 @@ type MenuItem = {
 
 export default function AccountScreen() {
   const navigation = useNavigation<Nav>();
-  const { user, signOut } = useAuth();
+  const tabBarHeight = useTabBarHeight();
+  const { user, restoring, signOut, refreshUser } = useAuth();
+
+  // Mở app là phải hỏi máy chủ xem cookie phiên còn hiệu lực không — trong lúc đó
+  // chưa biết đã đăng nhập hay chưa, đừng hiện nhầm màn "chưa đăng nhập".
+  if (restoring) {
+    return (
+      <Screen>
+        <LoadState loading={true} error={null} onRetry={() => refreshUser()} />
+      </Screen>
+    );
+  }
 
   if (!user) {
     return (
       <Screen>
         <View style={styles.guest}>
-          <View style={styles.guestIcon}>
-            <Ionicons name="person-outline" size={32} color={colors.textMuted} />
-          </View>
+          <Gradient colors={gradient.brandSoft} style={styles.guestIcon}>
+            <Ionicons name="person-outline" size={34} color={colors.primary} />
+          </Gradient>
           <Text style={styles.guestTitle}>Bạn chưa đăng nhập</Text>
           <Text style={styles.guestDesc}>
             Đăng nhập để mua hàng, theo dõi đơn và lưu lại các phiên tư vấn với trợ lý AI.
@@ -70,14 +78,29 @@ export default function AccountScreen() {
     },
   ];
 
-  // Các mục đã có API ở backend nhưng chưa dựng giao diện trong vòng này —
-  // ghi rõ ra thay vì để nút bấm không phản hồi.
   const personal: MenuItem[] = [
-    { icon: 'location-outline', label: 'Sổ địa chỉ', hint: 'Quản lý địa chỉ giao hàng', upcoming: true },
-    { icon: 'person-circle-outline', label: 'Hồ sơ cá nhân', hint: 'Họ tên, số điện thoại, ảnh đại diện', upcoming: true },
-    { icon: 'heart-outline', label: 'Sở thích mua sắm', hint: 'Giúp trợ lý AI tư vấn sát hơn', upcoming: true },
+    {
+      icon: 'location-outline',
+      label: 'Sổ địa chỉ',
+      hint: 'Quản lý địa chỉ giao hàng',
+      onPress: () => navigation.navigate('AddressBook'),
+    },
+    {
+      icon: 'person-circle-outline',
+      label: 'Hồ sơ cá nhân',
+      hint: 'Họ tên, số điện thoại',
+      onPress: () => navigation.navigate('Profile'),
+    },
+    {
+      icon: 'heart-outline',
+      label: 'Sở thích mua sắm',
+      hint: 'Giúp trợ lý AI tư vấn sát hơn',
+      onPress: () => navigation.navigate('Preferences'),
+    },
   ];
 
+  // Các mục đã có API/kế hoạch nhưng chưa dựng giao diện — ghi rõ ra thay vì để nút
+  // bấm không phản hồi.
   const mobile: MenuItem[] = [
     { icon: 'finger-print-outline', label: 'Mở khoá bằng sinh trắc học', hint: 'UC-MOB-03', upcoming: true },
     { icon: 'cloud-offline-outline', label: 'Xem lại khi mất mạng', hint: 'UC-MOB-05', upcoming: true },
@@ -85,12 +108,12 @@ export default function AccountScreen() {
 
   return (
     <Screen>
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={[styles.scroll, { paddingBottom: tabBarHeight + spacing.lg }]}>
         {/* ---- Thẻ hồ sơ ---- */}
         <View style={styles.profile}>
-          <View style={styles.avatar}>
+          <Gradient colors={gradient.brand} style={styles.avatar}>
             <Text style={styles.avatarText}>{avatarInitial(user.full_name)}</Text>
-          </View>
+          </Gradient>
           <View style={styles.flex}>
             <Text style={styles.name}>{user.full_name}</Text>
             <Text style={styles.email}>{user.email ?? user.phone_number ?? '—'}</Text>
@@ -156,14 +179,13 @@ function MenuGroup({ title, items }: { title: string; items: MenuItem[] }) {
 
 const styles = StyleSheet.create({
   flex: { flex: 1 },
-  scroll: { padding: spacing.lg, paddingBottom: tabBarHeight + spacing.lg, gap: spacing.lg },
+  scroll: { padding: spacing.lg, gap: spacing.lg },
 
   guest: { flex: 1, justifyContent: 'center', paddingHorizontal: spacing.xl, gap: spacing.sm },
   guestIcon: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    backgroundColor: colors.surfaceAlt,
+    width: 84,
+    height: 84,
+    borderRadius: 42,
     alignItems: 'center',
     justifyContent: 'center',
     alignSelf: 'center',
@@ -185,19 +207,18 @@ const styles = StyleSheet.create({
     gap: spacing.lg,
     padding: spacing.lg,
     backgroundColor: colors.surface,
-    borderRadius: radius.lg,
+    borderRadius: radius.xl,
     ...shadow.card,
   },
   avatar: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: colors.primary,
+    width: 60,
+    height: 60,
+    borderRadius: 30,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  avatarText: { fontSize: 22, fontWeight: '700', color: colors.textInverse },
-  name: { fontSize: 17, fontWeight: '700', color: colors.text },
+  avatarText: { fontSize: 24, fontWeight: '800', color: colors.textInverse },
+  name: { fontSize: 18, fontWeight: '700', color: colors.text, letterSpacing: -0.3 },
   email: { fontSize: 13, color: colors.textSecondary, marginTop: 2 },
   since: { fontSize: 11.5, color: colors.textMuted, marginTop: 3 },
 
@@ -210,13 +231,13 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     paddingHorizontal: spacing.xs,
   },
-  groupBody: { backgroundColor: colors.surface, borderRadius: radius.lg, ...shadow.card },
+  groupBody: { backgroundColor: colors.surface, borderRadius: radius.xl, ...shadow.card },
   row: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, padding: spacing.lg },
   rowBorder: { borderTopWidth: 1, borderTopColor: colors.border },
   rowIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: radius.md,
+    width: 38,
+    height: 38,
+    borderRadius: radius.lg,
     backgroundColor: colors.primarySoft,
     alignItems: 'center',
     justifyContent: 'center',
@@ -225,9 +246,9 @@ const styles = StyleSheet.create({
   rowLabelMuted: { color: colors.textSecondary },
   rowHint: { fontSize: 12, color: colors.textMuted, marginTop: 2 },
   soonTag: {
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 2,
-    borderRadius: radius.sm,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 3,
+    borderRadius: radius.pill,
     backgroundColor: colors.surfaceAlt,
   },
   soonText: { fontSize: 10.5, fontWeight: '700', color: colors.textMuted },

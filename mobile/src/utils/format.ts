@@ -56,3 +56,9 @@ export const PAYMENT_STATUS_COLOR: Record<string, string> = {
   failed: 'red',
   refunded: 'purple',
 };
+
+// Chữ cái đầu của TÊN (từ cuối trong họ tên tiếng Việt) — dùng cho avatar chữ.
+export function avatarInitial(fullName: string): string {
+  const parts = fullName.trim().split(/\s+/);
+  return (parts[parts.length - 1]?.[0] ?? '?').toUpperCase();
+}

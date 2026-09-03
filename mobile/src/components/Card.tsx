@@ -21,7 +21,13 @@ export default function Card({
 }
 
 const styles = StyleSheet.create({
-  card: { backgroundColor: colors.surface, borderRadius: radius.lg, ...shadow.card },
+  card: {
+    backgroundColor: colors.surface,
+    borderRadius: radius.xl,
+    // Không viền: thẻ luôn nằm trên nền xám, chỉ riêng đổ bóng đã đủ tách khỏi nền,
+    // thêm viền thành hai đường ranh giới chồng nhau.
+    ...shadow.card,
+  },
   padded: { padding: spacing.lg },
-  title: { fontSize: 15, fontWeight: '700', color: colors.text, marginBottom: spacing.md },
+  title: { fontSize: 15, fontWeight: '700', color: colors.text, marginBottom: spacing.md, letterSpacing: -0.2 },
 });

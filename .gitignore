@@ -3,12 +3,6 @@
 # dependencies
 node_modules/
 
-# Expo
-.expo/
-dist/
-web-build/
-expo-env.d.ts
-
 # Native
 .kotlin/
 *.orig.*
@@ -32,10 +26,27 @@ yarn-error.*
 
 # local env files
 .env*.local
+# IP backend của từng máy, mỗi người một khác (xem mobile/.env.example)
+mobile/.env
 
 # typescript
 *.tsbuildinfo
 
-# generated native folders
-mobile/ios
-mobile/android
+# Xcode
+mobile/ios/build/
+mobile/ios/Pods/
+**/.xcode.env.local
+xcuserdata/
+*.xcuserstate
+DerivedData/
+
+# Android / Gradle
+mobile/android/.gradle/
+mobile/android/app/build/
+mobile/android/build/
+mobile/android/local.properties
+*.iml
+*.hprof
+
+# bundle JS đóng gói sẵn
+*.jsbundle

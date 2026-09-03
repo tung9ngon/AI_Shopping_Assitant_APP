@@ -2,10 +2,10 @@
 //
 // Trên màn hình nhỏ, bộ lọc đầy đủ đặt trong lớp phủ trượt lên (bottom sheet) thay vì
 // cột lọc bên trái như bản web; chỉ danh mục — thứ dùng nhiều nhất — giữ ngay trên đầu.
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
+  ActivityIndicator,
   FlatList,
-  Modal,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -14,39 +14,52 @@ import {
   useWindowDimensions,
   View,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@react-native-vector-icons/ionicons/static';
 import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
 import Screen from '../../components/Screen';
 import ProductCard from '../../components/ProductCard';
 import AppButton from '../../components/AppButton';
+import BottomSheet from '../../components/BottomSheet';
 import EmptyState from '../../components/EmptyState';
-import { colors, radius, shadow, spacing, tabBarHeight } from '../../theme';
-import { mockBrands, mockCategories, mockProducts } from '../../mocks/data';
+import Chip from '../../components/Chip';
+import LoadState from '../../components/LoadState';
+import { ProductGridSkeleton } from '../../components/Skeleton';
+import { useApi } from '../../hooks/useApi';
+import { categoryApi } from '../../api/categories';
+import { productApi, type ProductListItem } from '../../api/products';
+import { colors, radius, shadow, spacing, useTabBarHeight } from '../../theme';
+import { getItems } from '../../types';
 import type { RootStackParamList, TabParamList } from '../../navigation/types';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
-type Sort = 'newest' | 'price_asc' | 'price_desc' | 'rating';
+// Giá trị khớp đúng QueryProductDto.sort của backend.
+type Sort = 'newest' | 'price_asc' | 'price_desc' | 'rating_desc';
+
+const PAGE_LIMIT = 50;
+const SEARCH_DEBOUNCE_MS = 400;
 
 const SORTS: { key: Sort; label: string }[] = [
   { key: 'newest', label: 'Mới nhất' },
   { key: 'price_asc', label: 'Giá thấp đến cao' },
   { key: 'price_desc', label: 'Giá cao đến thấp' },
-  { key: 'rating', label: 'Đánh giá cao' },
+  { key: 'rating_desc', label: 'Đánh giá cao' },
 ];
 
-const PRICE_BANDS: { label: string; min: number; max: number }[] = [
+const PRICE_BANDS: { label: string; min: number; max: number | null }[] = [
   { label: 'Dưới 5 triệu', min: 0, max: 5_000_000 },
   { label: '5 – 10 triệu', min: 5_000_000, max: 10_000_000 },
   { label: '10 – 20 triệu', min: 10_000_000, max: 20_000_000 },
-  { label: 'Trên 20 triệu', min: 20_000_000, max: Number.MAX_SAFE_INTEGER },
+  // `max: null` = không giới hạn trên; không gửi maxPrice lên backend.
+  { label: 'Trên 20 triệu', min: 20_000_000, max: null },
 ];
 
 export default function ProductsScreen() {
   const navigation = useNavigation<Nav>();
   const route = useRoute<RouteProp<TabParamList, 'Products'>>();
   const { width } = useWindowDimensions();
+  const tabBarHeight = useTabBarHeight();
 
   const [keyword, setKeyword] = useState('');
   const [categoryId, setCategoryId] = useState<string | null>(null);
@@ -55,44 +68,107 @@ export default function ProductsScreen() {
   const [sort, setSort] = useState<Sort>('newest');
   const [filterOpen, setFilterOpen] = useState(false);
 
-  // Trang chủ điều hướng sang kèm danh mục hoặc từ khoá — nhận vào đây.
+  // Trang chủ điều hướng sang kèm danh mục hoặc từ khoá — nhận vào đây. Từ khoá đặt
+  // thẳng cả searchTerm (không qua debounce): debounce chỉ dành cho người đang gõ,
+  // còn đợi 400ms ở đây thì lượt fetch đầu chạy với từ khoá rỗng — kết quả không lọc
+  // chớp qua màn hình rồi mới đổi.
   useEffect(() => {
     if (route.params?.categoryId !== undefined) setCategoryId(route.params.categoryId ?? null);
-    if (route.params?.keyword !== undefined) setKeyword(route.params.keyword ?? '');
+    if (route.params?.keyword !== undefined) {
+      const kw = route.params.keyword ?? '';
+      setKeyword(kw);
+      setSearchTerm(kw.trim());
+    }
+    // Chip thương hiệu ở Trang chủ đi qua param `brand` — search của BE chỉ khớp
+    // tên sản phẩm, không khớp hãng.
+    if (route.params?.brand !== undefined) setBrand(route.params.brand ?? null);
   }, [route.params]);
 
   const cardWidth = (width - spacing.lg * 2 - spacing.md) / 2;
 
+  // Gõ tới đâu gọi API tới đó thì mỗi ký tự là một request — đợi người dùng ngừng gõ.
+  const [searchTerm, setSearchTerm] = useState('');
+  useEffect(() => {
+    const timer = setTimeout(() => setSearchTerm(keyword.trim()), SEARCH_DEBOUNCE_MS);
+    return () => clearTimeout(timer);
+  }, [keyword]);
+
+  const categories = useApi(() => categoryApi.list(), []);
+  const brands = useApi(() => productApi.brands(), []);
+
+  // Lọc và sắp xếp do backend làm (QueryProductDto), app chỉ gửi tham số.
+  const range = band != null ? PRICE_BANDS[band] : null;
+  const query = {
+    search: searchTerm || undefined,
+    categoryId: categoryId ?? undefined,
+    brand: brand ?? undefined,
+    minPrice: range?.min,
+    maxPrice: range?.max ?? undefined,
+    sort,
+    limit: PAGE_LIMIT,
+  };
+  const page = useApi(
+    (signal) => productApi.list(query, signal),
+    [searchTerm, categoryId, brand, band, sort],
+  );
+
+  // Các trang sau trang 1, nạp dồn khi cuộn tới cuối. Lưu KÈM khoá truy vấn đã tạo ra
+  // chúng: đổi bộ lọc thì phần nạp dồn tự thành rỗng ngay trong render (không có khung
+  // hình nào nối nhầm trang của bộ lọc cũ), và lượt "tải thêm" về muộn thuộc bộ lọc cũ
+  // cũng vô hại vì khoá không khớp.
+  const queryKey = `${searchTerm}|${categoryId}|${brand}|${band}|${sort}`;
+  const [extra, setExtra] = useState<{ key: string; items: ProductListItem[]; nextPage: number }>({
+    key: queryKey,
+    items: [],
+    nextPage: 2,
+  });
+  const [loadingMore, setLoadingMore] = useState(false);
+  const extraItems = extra.key === queryKey ? extra.items : [];
+
+  const total = page.data?.total ?? 0;
+  // Trang sau có thể lặp lại sản phẩm của trang trước (dữ liệu đổi giữa hai lần gọi)
+  // — lọc trùng id để FlatList không gặp key trùng.
   const results = useMemo(() => {
-    const kw = keyword.trim().toLowerCase();
-    const range = band != null ? PRICE_BANDS[band] : null;
+    if (!page.data) return [];
+    const seen = new Set<string>();
+    return [...getItems(page.data), ...extraItems].filter((p) =>
+      seen.has(p.id) ? false : (seen.add(p.id), true),
+    );
+  }, [page.data, extraItems]);
 
-    const filtered = mockProducts.filter((p) => {
-      if (categoryId && p.category_id !== categoryId) return false;
-      if (brand && p.brand !== brand) return false;
-      if (kw && !`${p.name} ${p.brand ?? ''}`.toLowerCase().includes(kw)) return false;
-      if (range) {
-        const price = Number(p.price);
-        if (price < range.min || price >= range.max) return false;
-      }
-      return true;
-    });
-
-    return filtered.sort((a, b) => {
-      switch (sort) {
-        case 'price_asc':
-          return Number(a.price) - Number(b.price);
-        case 'price_desc':
-          return Number(b.price) - Number(a.price);
-        case 'rating':
-          return Number(b.rating ?? 0) - Number(a.rating ?? 0);
-        default:
-          return +new Date(b.created_at) - +new Date(a.created_at);
-      }
-    });
-  }, [keyword, categoryId, brand, band, sort]);
+  const loadMore = async () => {
+    if (loadingMore || page.loading || !page.data || results.length >= total) return;
+    const key = queryKey;
+    const pageToLoad = extra.key === key ? extra.nextPage : 2;
+    setLoadingMore(true);
+    try {
+      const res = await productApi.list({ ...query, page: pageToLoad });
+      setExtra((prev) => ({
+        key,
+        items: [...(prev.key === key ? prev.items : []), ...getItems(res)],
+        nextPage: pageToLoad + 1,
+      }));
+    } catch {
+      // Lỗi mạng lúc nạp thêm: giữ nguyên phần đã hiện, người dùng cuộn tiếp sẽ thử lại.
+    } finally {
+      setLoadingMore(false);
+    }
+  };
 
   const activeFilters = (brand ? 1 : 0) + (band != null ? 1 : 0) + (sort !== 'newest' ? 1 : 0);
+
+  // renderItem ổn định + ProductCard bọc memo: gõ từng ký tự vào ô tìm kiếm chỉ
+  // re-render phần header, không vẽ lại cả lưới 50 thẻ ảnh theo từng phím.
+  const renderItem = useCallback(
+    ({ item }: { item: ProductListItem }) => (
+      <ProductCard
+        product={item}
+        width={cardWidth}
+        onPress={() => navigation.navigate('ProductDetail', { productId: item.id })}
+      />
+    ),
+    [cardWidth, navigation],
+  );
 
   const resetFilters = () => {
     setBrand(null);
@@ -102,50 +178,60 @@ export default function ProductsScreen() {
 
   return (
     <Screen>
-      {/* ---- Ô tìm kiếm + nút mở bộ lọc ---- */}
-      <View style={styles.searchWrap}>
-        <View style={styles.searchBar}>
-          <Ionicons name="search" size={18} color={colors.textMuted} />
-          <TextInput
-            value={keyword}
-            onChangeText={setKeyword}
-            placeholder="Tìm sản phẩm…"
-            placeholderTextColor={colors.textMuted}
-            style={styles.searchInput}
-            returnKeyType="search"
-            accessibilityLabel="Ô tìm sản phẩm"
-          />
-          {keyword ? (
-            <Pressable onPress={() => setKeyword('')} hitSlop={8} accessibilityLabel="Xoá từ khoá">
-              <Ionicons name="close-circle" size={18} color={colors.textMuted} />
-            </Pressable>
-          ) : null}
+      {/* ---- Đầu trang: ô tìm kiếm, nút lọc, hàng danh mục ----
+          Gộp làm một khối trắng nổi trên nền xám thay vì hai dải kẻ vạch ngăn cách:
+          cả ba thứ đều là công cụ lọc, tách ra thành hai tầng viền làm rối mắt. */}
+      <View style={styles.header}>
+        <View style={styles.searchWrap}>
+          <View style={styles.searchBar}>
+            <Ionicons name="search" size={18} color={colors.textMuted} />
+            <TextInput
+              value={keyword}
+              onChangeText={setKeyword}
+              placeholder="Tìm sản phẩm…"
+              placeholderTextColor={colors.textMuted}
+              style={styles.searchInput}
+              returnKeyType="search"
+              accessibilityLabel="Ô tìm sản phẩm"
+            />
+            {keyword ? (
+              <Pressable onPress={() => setKeyword('')} hitSlop={8} accessibilityLabel="Xoá từ khoá">
+                <Ionicons name="close-circle" size={18} color={colors.textMuted} />
+              </Pressable>
+            ) : null}
+          </View>
+
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Mở bộ lọc"
+            onPress={() => setFilterOpen(true)}
+            style={({ pressed }) => [
+              styles.filterBtn,
+              activeFilters > 0 && styles.filterBtnActive,
+              pressed && styles.filterBtnPressed,
+            ]}
+          >
+            <Ionicons
+              name="options-outline"
+              size={20}
+              color={activeFilters > 0 ? colors.primary : colors.text}
+            />
+            {activeFilters > 0 ? (
+              <View style={styles.filterCount}>
+                <Text style={styles.filterCountText}>{activeFilters}</Text>
+              </View>
+            ) : null}
+          </Pressable>
         </View>
 
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Mở bộ lọc"
-          onPress={() => setFilterOpen(true)}
-          style={styles.filterBtn}
-        >
-          <Ionicons name="options-outline" size={20} color={colors.text} />
-          {activeFilters > 0 ? (
-            <View style={styles.filterCount}>
-              <Text style={styles.filterCountText}>{activeFilters}</Text>
-            </View>
-          ) : null}
-        </Pressable>
-      </View>
-
-      {/* ---- Danh mục ---- */}
-      <View>
+        {/* ---- Danh mục ---- */}
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.chipRow}
         >
           <Chip label="Tất cả" active={categoryId === null} onPress={() => setCategoryId(null)} />
-          {mockCategories.map((c) => (
+          {(categories.data ?? []).map((c) => (
             <Chip
               key={c.id}
               label={c.name}
@@ -161,14 +247,35 @@ export default function ProductsScreen() {
         keyExtractor={(p) => p.id}
         numColumns={2}
         columnWrapperStyle={styles.column}
-        contentContainerStyle={styles.list}
+        contentContainerStyle={[styles.list, { paddingBottom: tabBarHeight + spacing.lg }]}
         showsVerticalScrollIndicator={false}
+        onEndReached={loadMore}
+        onEndReachedThreshold={0.4}
+        ListFooterComponent={
+          loadingMore ? <ActivityIndicator color={colors.primary} style={styles.footerLoading} /> : null
+        }
         ListHeaderComponent={
           results.length > 0 ? (
-            <Text style={styles.count}>{results.length} sản phẩm</Text>
+            <Text style={styles.count}>
+              {total > results.length ? (
+                <>
+                  Đang hiện <Text style={styles.countStrong}>{results.length}</Text> trong {total}{' '}
+                  sản phẩm
+                </>
+              ) : (
+                <>
+                  <Text style={styles.countStrong}>{total}</Text> sản phẩm
+                </>
+              )}
+            </Text>
           ) : null
         }
         ListEmptyComponent={
+          page.loading ? (
+            <ProductGridSkeleton width={cardWidth} count={6} />
+          ) : page.error ? (
+            <LoadState loading={false} error={page.error} onRetry={page.reload} />
+          ) : (
           <EmptyState
             icon="search-outline"
             title="Không tìm thấy sản phẩm nào"
@@ -180,21 +287,13 @@ export default function ProductsScreen() {
               setKeyword('');
             }}
           />
+          )
         }
-        renderItem={({ item }) => (
-          <ProductCard
-            product={item}
-            width={cardWidth}
-            onPress={() => navigation.navigate('ProductDetail', { productId: item.id })}
-          />
-        )}
+        renderItem={renderItem}
       />
 
       {/* ---- Lớp phủ bộ lọc ---- */}
-      <Modal visible={filterOpen} transparent animationType="slide" onRequestClose={() => setFilterOpen(false)}>
-        <Pressable style={styles.backdrop} onPress={() => setFilterOpen(false)} />
-        <View style={styles.sheet}>
-          <View style={styles.sheetHandle} />
+      <BottomSheet visible={filterOpen} onClose={() => setFilterOpen(false)}>
           <View style={styles.sheetHeader}>
             <Text style={styles.sheetTitle}>Bộ lọc</Text>
             <Pressable onPress={resetFilters} hitSlop={8} accessibilityRole="button">
@@ -224,7 +323,7 @@ export default function ProductsScreen() {
 
             <Text style={styles.groupTitle}>Thương hiệu</Text>
             <View style={styles.wrapRow}>
-              {mockBrands.map((b) => (
+              {(brands.data ?? []).map((b) => (
                 <Chip
                   key={b}
                   label={b}
@@ -236,38 +335,34 @@ export default function ProductsScreen() {
           </ScrollView>
 
           <AppButton
-            title={`Xem ${results.length} sản phẩm`}
+            title={`Xem ${total} sản phẩm`}
             block
             onPress={() => setFilterOpen(false)}
             style={{ marginTop: spacing.lg }}
           />
-        </View>
-      </Modal>
+      </BottomSheet>
     </Screen>
   );
 }
 
-function Chip({ label, active, onPress }: { label: string; active: boolean; onPress: () => void }) {
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityState={{ selected: active }}
-      onPress={onPress}
-      style={[styles.chip, active && styles.chipActive]}
-    >
-      <Text style={[styles.chipText, active && styles.chipTextActive]}>{label}</Text>
-    </Pressable>
-  );
-}
-
 const styles = StyleSheet.create({
+  // Cả khối đầu trang là một tấm trắng bo góc dưới, đổ bóng xuống phần danh sách —
+  // thay cho hai dải kẻ viền chồng nhau ở bản trước.
+  header: {
+    backgroundColor: colors.surface,
+    borderBottomLeftRadius: radius.xl,
+    borderBottomRightRadius: radius.xl,
+    ...shadow.card,
+    // Bóng phải nổi lên trên danh sách bên dưới, nếu không lưới sản phẩm che mất.
+    zIndex: 2,
+  },
   searchWrap: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
     paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
-    backgroundColor: colors.surface,
+    paddingTop: spacing.md,
+    paddingBottom: spacing.sm,
   },
   searchBar: {
     flex: 1,
@@ -275,19 +370,27 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: spacing.sm,
     backgroundColor: colors.bg,
+    borderWidth: 1,
+    borderColor: colors.border,
     borderRadius: radius.pill,
     paddingHorizontal: spacing.lg,
-    height: 42,
+    height: 46,
   },
   searchInput: { flex: 1, fontSize: 14, color: colors.text, paddingVertical: 0 },
   filterBtn: {
-    width: 42,
-    height: 42,
-    borderRadius: radius.md,
+    width: 46,
+    height: 46,
+    borderRadius: radius.pill,
     backgroundColor: colors.bg,
+    borderWidth: 1,
+    borderColor: colors.border,
     alignItems: 'center',
     justifyContent: 'center',
   },
+  // Đang có bộ lọc thì nút đổi sang sắc thương hiệu — huy hiệu đếm ở góc nhỏ, chỉ
+  // mình nó thì dễ bỏ sót.
+  filterBtnActive: { backgroundColor: colors.primarySoft, borderColor: colors.primary },
+  filterBtnPressed: { backgroundColor: colors.border },
   filterCount: {
     position: 'absolute',
     top: 2,
@@ -303,47 +406,20 @@ const styles = StyleSheet.create({
   filterCountText: { color: colors.textInverse, fontSize: 10, fontWeight: '700' },
 
   chipRow: { paddingHorizontal: spacing.lg, paddingBottom: spacing.md, gap: spacing.sm },
-  chip: {
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.sm,
-    borderRadius: radius.pill,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  chipActive: { backgroundColor: colors.primarySoft, borderColor: colors.primary },
-  chipText: { fontSize: 13, color: colors.textSecondary, fontWeight: '600' },
-  chipTextActive: { color: colors.primary },
 
   count: { fontSize: 13, color: colors.textMuted, marginBottom: spacing.md },
-  list: { paddingHorizontal: spacing.lg, paddingBottom: tabBarHeight + spacing.lg },
-  column: { gap: spacing.md, marginBottom: spacing.md },
+  footerLoading: { paddingVertical: spacing.lg },
+  countStrong: { fontWeight: '700', color: colors.text },
+  list: { paddingHorizontal: spacing.lg, paddingTop: spacing.lg },
+  column: { gap: spacing.md, marginBottom: spacing.md, alignItems: 'flex-start' },
 
-  backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.35)' },
-  sheet: {
-    backgroundColor: colors.surface,
-    borderTopLeftRadius: radius.xl,
-    borderTopRightRadius: radius.xl,
-    padding: spacing.lg,
-    paddingBottom: spacing.xxl,
-    maxHeight: '75%',
-    ...shadow.raised,
-  },
-  sheetHandle: {
-    width: 40,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: colors.borderStrong,
-    alignSelf: 'center',
-    marginBottom: spacing.lg,
-  },
   sheetHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     marginBottom: spacing.md,
   },
-  sheetTitle: { fontSize: 18, fontWeight: '700', color: colors.text },
+  sheetTitle: { fontSize: 18, fontWeight: '700', color: colors.text, letterSpacing: -0.2 },
   reset: { fontSize: 14, fontWeight: '600', color: colors.primary },
   groupTitle: {
     fontSize: 14,

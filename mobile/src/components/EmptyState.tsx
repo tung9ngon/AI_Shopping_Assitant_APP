@@ -1,7 +1,8 @@
 import { StyleSheet, Text, View } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons, { type IoniconsIconName } from '@react-native-vector-icons/ionicons/static';
 import AppButton from './AppButton';
-import { colors, spacing } from '../theme';
+import Gradient from './Gradient';
+import { colors, gradient, spacing } from '../theme';
 
 export default function EmptyState({
   icon = 'file-tray-outline',
@@ -10,7 +11,7 @@ export default function EmptyState({
   actionTitle,
   onAction,
 }: {
-  icon?: keyof typeof Ionicons.glyphMap;
+  icon?: IoniconsIconName;
   title: string;
   description?: string;
   actionTitle?: string;
@@ -18,9 +19,9 @@ export default function EmptyState({
 }) {
   return (
     <View style={styles.wrap}>
-      <View style={styles.iconBox}>
-        <Ionicons name={icon} size={34} color={colors.textMuted} />
-      </View>
+      <Gradient colors={gradient.brandSoft} style={styles.iconBox}>
+        <Ionicons name={icon} size={36} color={colors.primary} />
+      </Gradient>
       <Text style={styles.title}>{title}</Text>
       {description ? <Text style={styles.desc}>{description}</Text> : null}
       {actionTitle && onAction ? (
@@ -33,15 +34,14 @@ export default function EmptyState({
 const styles = StyleSheet.create({
   wrap: { alignItems: 'center', paddingVertical: spacing.xxl * 2, paddingHorizontal: spacing.xl },
   iconBox: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    backgroundColor: colors.surfaceAlt,
+    width: 84,
+    height: 84,
+    borderRadius: 42,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: spacing.lg,
   },
-  title: { fontSize: 16, fontWeight: '600', color: colors.text, textAlign: 'center' },
+  title: { fontSize: 17, fontWeight: '700', color: colors.text, textAlign: 'center' },
   desc: {
     fontSize: 14,
     color: colors.textMuted,

@@ -8,5 +8,6 @@ import { ProductModule } from '../product/product.module';
   imports: [ConfigModule, ProductModule], // ProductModule export ProductService
   controllers: [ChatController],
   providers: [ChatService],
+  exports: [ChatService], // ConversationModule dùng lại để sinh câu trả lời của agent
 })
 export class ChatModule {}

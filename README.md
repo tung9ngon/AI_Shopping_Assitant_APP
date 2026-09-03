@@ -4,15 +4,22 @@ Kho này chia làm hai phần độc lập, mỗi phần có `package.json` riê
 
 | Thư mục | Nội dung |
 |---|---|
-| [`mobile/`](mobile/) | App React Native, Expo SDK 54 — xem [mobile/README.md](mobile/README.md) |
+| [`mobile/`](mobile/) | App React Native 0.81 CLI — xem [mobile/README.md](mobile/README.md) |
 | [`backend/`](backend/) | API NestJS 11 — xem [backend/README.md](backend/README.md) |
 
 ## Chạy
 
 ```bash
-cd backend && npm install && npm run start:dev   # API (cần backend/.env)
-cd mobile  && npm install && npm start           # Expo
+cd backend && npm install && npm run start:dev   # API, cần backend/.env
+
+cd mobile && npm install
+cp .env.example .env   # sửa API_URL thành IP máy chạy backend
+npm run pods           # chỉ cần cho iOS
+npm run ios            # hoặc: npm run android
 ```
+
+Sửa `mobile/.env` thì phải **build lại**, reload Metro là chưa đủ —
+`react-native-config` nhúng giá trị vào lúc build chứ không đọc lúc chạy.
 
 ## Ghi chú
 
@@ -20,6 +27,11 @@ cd mobile  && npm install && npm start           # Expo
   `node_modules/`, `dist/`, `*.tsbuildinfo`. Từ đây hai bản rẽ nhánh: sửa ở kho này không
   ảnh hưởng bản web và ngược lại.
 - `backend/.env` chứa khoá thật và **không** được commit (`backend/.gitignore`).
-- App di động chưa đấu API thật — dữ liệu vẫn lấy từ `mobile/src/mocks/data.ts`.
-  Tồn đọng cần xử lý trước khi đấu: BE mới đọc JWT từ cookie, phải cho nhận header
-  `Authorization: Bearer` (`backend/src/users/auth/jwt.strategy.ts`).
+  `mobile/.env` cũng vậy vì mỗi máy một địa chỉ IP (`.gitignore` ở gốc).
+- Mọi màn hình của app **đã gọi API thật**, không còn dữ liệu mẫu trong mã nguồn.
+- Phiên đăng nhập đi bằng **cookie httpOnly**: backend không trả token trong body và
+  `backend/src/users/auth/jwt.strategy.ts` chỉ đọc `req.cookies`, nên app không giữ
+  token mà dựa vào kho cookie của hệ điều hành. Hệ quả đã biết: **đăng nhập
+  Google/Facebook chưa dùng được trên app** (cookie rơi vào trình duyệt ở bước chuyển
+  hướng 302); đăng nhập bằng email không dính. Chi tiết ở
+  [mobile/README.md](mobile/README.md).

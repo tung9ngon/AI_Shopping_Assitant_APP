@@ -4,15 +4,18 @@
 // Khác bản web ở chỗ căn bản: web để chat trong widget góc màn hình và xoá sạch khi đóng
 // tab (sessionStorage). Ở đây chat là một màn hình đầy đủ — mục 3.1.b của tài liệu.
 //
-// Phần trả lời hiện là mô phỏng tại chỗ. Khi đấu API thật, hàm `askAssistant` bên dưới
-// được thay bằng lời gọi tới nhóm endpoint /chat và /conversations của backend; Gemini
-// tự gọi công cụ `search_products` nên phía app không phải tự lọc sản phẩm.
-import { useMemo, useRef, useState } from 'react';
+// Hội thoại đi qua /api/conversations: máy chủ lưu từng tin nhắn rồi tự dựng ngữ cảnh
+// gửi cho Gemini, nên app chỉ giữ id phiên đang mở. Gemini tự gọi công cụ
+// `search_products`, phía app không phải tự lọc sản phẩm.
+//
+// Nhờ vậy các phiên cũ (UC-AI-02) mở lại được nguyên mạch tư vấn, kể cả các sản phẩm
+// đã gợi ý — chúng nằm trong `metadata` của tin nhắn.
+import { memo, useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
   KeyboardAvoidingView,
-  Modal,
   Platform,
   Pressable,
   ScrollView,
@@ -21,117 +24,194 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@react-native-vector-icons/ionicons/static';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
 import Screen from '../../components/Screen';
+import BottomSheet from '../../components/BottomSheet';
 import ProductThumb from '../../components/ProductThumb';
-import { colors, radius, shadow, spacing } from '../../theme';
-import { formatVND } from '../../utils/format';
-import { mockChatHistory, mockChatSuggestions, mockProducts, type ChatMessage } from '../../mocks/data';
+import Gradient from '../../components/Gradient';
+import { chatApi, type ConversationMessage, type ConversationSummary } from '../../api/chat';
+import { getErrorMessage } from '../../api/client';
+import { useAuth } from '../../context/AuthContext';
+import { colors, gradient, radius, shadow, spacing } from '../../theme';
+import { formatDate, formatVND } from '../../utils/format';
+import { getItems } from '../../types';
+import type { ProductListItem } from '../../api/products';
 import type { RootStackParamList } from '../../navigation/types';
-import type { Product } from '../../types';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
-// Giới hạn lấy từ backend hiện tại: mỗi lượt tra cứu trả tối đa 6 sản phẩm,
-// tin nhắn tối đa 2.000 ký tự.
-const MAX_PRODUCTS_PER_TURN = 6;
+interface ChatMessage {
+  id: string;
+  role: 'user' | 'assistant';
+  content: string;
+  products?: ProductListItem[];
+  created_at: string;
+}
+
+// Giới hạn của backend: tin nhắn tối đa 2.000 ký tự (@MaxLength trong chat.dto.ts).
 const MAX_MESSAGE_LENGTH = 2000;
 
-// Mô phỏng vòng gọi công cụ `search_products`: khớp từ khoá và ngưỡng giá trong câu hỏi.
-function askAssistant(question: string): { content: string; products: Product[] } {
-  const q = question.toLowerCase();
+// Lời chào là chữ của app, không phải tin nhắn từ máy chủ: nó không được lưu vào
+// hội thoại nên cũng không lọt vào ngữ cảnh gửi cho Gemini.
+const GREETING: ChatMessage = {
+  id: 'greeting',
+  role: 'assistant',
+  content:
+    'Chào bạn! Mình là trợ lý mua sắm của NexTech. Bạn cứ nói nhu cầu bằng lời thường thôi — ví dụ "laptop cho sinh viên dưới 20 triệu" — mình sẽ tra kho hàng thật rồi tư vấn.',
+  created_at: new Date().toISOString(),
+};
 
-  const budgetMatch = q.match(/(\d+([.,]\d+)?)\s*(triệu|tr\b|củ)/);
-  const budget = budgetMatch ? parseFloat(budgetMatch[1].replace(',', '.')) * 1_000_000 : null;
-
-  const keywords = ['laptop', 'điện thoại', 'tai nghe', 'đồng hồ', 'máy tính bảng', 'sạc'];
-  const hit = keywords.find((k) => q.includes(k));
-
-  let found = mockProducts.filter((p) => {
-    if (hit) {
-      const haystack = `${p.name} ${p.category?.name ?? ''}`.toLowerCase();
-      if (!haystack.includes(hit)) return false;
-    }
-    if (budget && Number(p.price) > budget * 1.15) return false;
-    return true;
-  });
-
-  if (found.length === 0) found = mockProducts.slice(0, 3);
-  found = found.sort((a, b) => Number(b.rating ?? 0) - Number(a.rating ?? 0)).slice(0, MAX_PRODUCTS_PER_TURN);
-
-  const budgetText = budget ? ` trong tầm ${formatVND(budget)}` : '';
-  const content =
-    `Mình vừa tra kho hàng và tìm được ${found.length} sản phẩm phù hợp${budgetText}. ` +
-    `Đứng đầu là ${found[0].name} — ${found[0].description?.split('.')[0] ?? 'đáng cân nhắc'}.\n\n` +
-    `Bạn bấm vào sản phẩm bên dưới để xem chi tiết, hoặc nói thêm về nhu cầu để mình lọc kỹ hơn nhé.`;
-
-  return { content, products: found };
+// Tin nhắn từ máy chủ -> tin nhắn để vẽ. `sender: 'agent'` là trợ lý.
+function toChatMessage(m: ConversationMessage): ChatMessage {
+  return {
+    id: m.id,
+    role: m.sender === 'user' ? 'user' : 'assistant',
+    content: m.content,
+    products: m.metadata?.products,
+    created_at: m.created_at,
+  };
 }
+
+const SUGGESTIONS = [
+  'Laptop cho sinh viên dưới 20 triệu',
+  'Điện thoại chụp ảnh đẹp dưới 10 triệu',
+  'Tai nghe chống ồn đi máy bay',
+  'Đồng hồ thông minh đo nhịp tim',
+];
 
 export default function ChatScreen() {
   const navigation = useNavigation<Nav>();
   const listRef = useRef<FlatList<ChatMessage>>(null);
+  const { isAuthenticated } = useAuth();
 
-  const [messages, setMessages] = useState<ChatMessage[]>(mockChatHistory);
+  const [messages, setMessages] = useState<ChatMessage[]>([GREETING]);
+  // Phiên đang mở. null = chưa có, tin nhắn đầu tiên sẽ tạo.
+  const [conversationId, setConversationId] = useState<string | null>(null);
   const [draft, setDraft] = useState('');
   const [thinking, setThinking] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
+  // null = đang tải danh sách phiên cũ.
+  const [sessions, setSessions] = useState<ConversationSummary[] | null>(null);
+  const [sessionsError, setSessionsError] = useState<string | null>(null);
+
+  // Mỗi lần ngữ cảnh phiên đổi (mở phiên cũ, đổi tài khoản) thì tăng "đời phiên":
+  // lượt gửi đang bay thuộc đời trước sẽ bị bỏ qua khi trả lời về muộn, không còn
+  // chuyện câu trả lời của phiên A chèn vào cuối phiên B vừa mở.
+  const epochRef = useRef(0);
+
+  // Đăng nhập / đăng xuất thì bỏ phiên đang mở: phiên của tài khoản cũ không còn
+  // thuộc về người đang cầm máy, gửi tiếp vào đó backend trả 403.
+  useEffect(() => {
+    epochRef.current += 1;
+    setConversationId(null);
+    setMessages([GREETING]);
+    setThinking(false);
+  }, [isAuthenticated]);
 
   const canSend = draft.trim().length > 0 && !thinking;
 
-  const send = (text: string) => {
+  const send = async (text: string) => {
     const content = text.trim();
     if (!content || thinking) return;
 
-    const userMsg: ChatMessage = {
-      id: `u-${Date.now()}`,
-      role: 'user',
-      content,
-      created_at: new Date().toISOString(),
-    };
-    setMessages((prev) => [...prev, userMsg]);
+    // Vẽ câu hỏi ngay, không đợi máy chủ. Máy chủ có bản của riêng nó (id thật) —
+    // bản tạm này chỉ sống trong màn hình cho tới khi mở lại phiên.
+    const tempId = `u-${Date.now()}`;
+    setMessages((prev) => [
+      ...prev,
+      { id: tempId, role: 'user', content, created_at: new Date().toISOString() },
+    ]);
     setDraft('');
     setThinking(true);
+    const epoch = epochRef.current;
 
-    // Độ trễ giả để thấy được trạng thái "đang soạn" — thay bằng gọi API thật sau này.
-    setTimeout(() => {
-      const answer = askAssistant(content);
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: `a-${Date.now()}`,
-          role: 'assistant',
-          content: answer.content,
-          products: answer.products,
-          created_at: new Date().toISOString(),
-        },
-      ]);
-      setThinking(false);
-    }, 900);
+    try {
+      // Phiên được tạo ở tin nhắn đầu tiên, không tạo sẵn lúc mở màn hình — mở ra rồi
+      // thoát mà không hỏi gì thì không để lại phiên rỗng trong lịch sử.
+      const id = conversationId ?? (await chatApi.createConversation()).id;
+      if (epochRef.current !== epoch) return;
+      if (!conversationId) setConversationId(id);
+
+      const answer = await chatApi.sendMessage(id, content);
+      if (epochRef.current !== epoch) return;
+      setMessages((prev) => [...prev, toChatMessage(answer)]);
+    } catch (err) {
+      if (epochRef.current !== epoch) return;
+      // Lỗi thì gỡ bong bóng tạm và trả nội dung về ô nhập: để bong bóng nằm lại là
+      // lệch với lịch sử thật (gửi hỏng thì máy chủ không có tin này), còn xoá trắng
+      // draft là bắt người dùng gõ lại từ đầu.
+      setMessages((prev) => prev.filter((m) => m.id !== tempId));
+      setDraft(content);
+      Alert.alert('Trợ lý chưa trả lời được', getErrorMessage(err));
+    } finally {
+      // Đời phiên đã đổi thì cờ thinking thuộc quyền của người đổi (openSession) —
+      // không giẫm lên.
+      if (epochRef.current === epoch) setThinking(false);
+    }
   };
 
   const remaining = MAX_MESSAGE_LENGTH - draft.length;
 
-  // Các phiên tư vấn cũ (UC-AI-02). Bản web mất sạch phần này khi đóng tab.
-  const pastSessions = useMemo(
-    () => [
-      { id: 's1', title: 'Laptop cho sinh viên 16 triệu', at: 'Hôm nay, 14:02', count: 3 },
-      { id: 's2', title: 'Tai nghe chống ồn đi máy bay', at: '19/08/2026', count: 6 },
-      { id: 's3', title: 'Điện thoại pin trâu dưới 8 triệu', at: '11/08/2026', count: 4 },
-    ],
-    [],
+  // renderItem ổn định + MessageBubble bọc memo: gõ draft trong composer không vẽ lại
+  // cả trăm bong bóng (kèm dải sản phẩm) của hội thoại dài theo từng phím.
+  const onProductPress = useCallback(
+    (id: string) => navigation.navigate('ProductDetail', { productId: id }),
+    [navigation],
   );
+  const renderItem = useCallback(
+    ({ item }: { item: ChatMessage }) => (
+      <MessageBubble message={item} onProductPress={onProductPress} />
+    ),
+    [onProductPress],
+  );
+
+  // UC-AI-02 — các phiên tư vấn cũ lưu trên máy chủ. Cần đăng nhập; chưa đăng nhập thì
+  // backend trả 401 và màn hình hiện đúng thông báo đó.
+  // Đóng rồi mở lại sheet khi lượt tải trước còn đang bay thì hai response chồng
+  // nhau — chỉ nhận kết quả của lượt mở mới nhất, cùng kiểu chặn của epochRef.
+  const historySeq = useRef(0);
+  const openHistory = async () => {
+    const seq = ++historySeq.current;
+    setHistoryOpen(true);
+    setSessions(null);
+    setSessionsError(null);
+    try {
+      const list = await chatApi.listConversations();
+      if (historySeq.current === seq) setSessions(list);
+    } catch (err) {
+      if (historySeq.current === seq) setSessionsError(getErrorMessage(err));
+    }
+  };
+
+  // Mở phiên cũ là hỏi tiếp được ngay trong phiên đó, không chỉ để đọc.
+  const openSession = async (id: string) => {
+    epochRef.current += 1;
+    const epoch = epochRef.current;
+    setHistoryOpen(false);
+    setThinking(true);
+    try {
+      const res = await chatApi.messagesOf(id);
+      if (epochRef.current !== epoch) return;
+      setMessages(getItems(res).map(toChatMessage));
+      setConversationId(id);
+    } catch (err) {
+      if (epochRef.current !== epoch) return;
+      Alert.alert('Không mở được phiên tư vấn', getErrorMessage(err));
+    } finally {
+      if (epochRef.current === epoch) setThinking(false);
+    }
+  };
 
   return (
     <Screen>
       {/* ---- Đầu màn hình ---- */}
       <View style={styles.header}>
-        <View style={styles.avatar}>
+        <Gradient colors={gradient.brand} style={styles.avatar}>
           <Ionicons name="sparkles" size={18} color={colors.textInverse} />
-        </View>
+        </Gradient>
         <View style={styles.headerText}>
           <Text style={styles.headerTitle}>Trợ lý NexTech</Text>
           <Text style={styles.headerSub}>Tư vấn dựa trên hàng đang có trong kho</Text>
@@ -139,7 +219,7 @@ export default function ChatScreen() {
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Lịch sử hội thoại"
-          onPress={() => setHistoryOpen(true)}
+          onPress={openHistory}
           hitSlop={8}
         >
           <Ionicons name="time-outline" size={22} color={colors.text} />
@@ -158,12 +238,7 @@ export default function ChatScreen() {
           contentContainerStyle={styles.list}
           showsVerticalScrollIndicator={false}
           onContentSizeChange={() => listRef.current?.scrollToEnd({ animated: true })}
-          renderItem={({ item }) => (
-            <MessageBubble
-              message={item}
-              onProductPress={(id) => navigation.navigate('ProductDetail', { productId: id })}
-            />
-          )}
+          renderItem={renderItem}
           ListFooterComponent={
             thinking ? (
               <View style={styles.thinking}>
@@ -175,13 +250,14 @@ export default function ChatScreen() {
         />
 
         {/* ---- Gợi ý câu hỏi ---- */}
-        {messages.length <= mockChatHistory.length ? (
+        {messages.length <= 1 ? (
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
+            style={styles.suggestionsBar}
             contentContainerStyle={styles.suggestions}
           >
-            {mockChatSuggestions.map((s) => (
+            {SUGGESTIONS.map((s) => (
               <Pressable
                 key={s}
                 accessibilityRole="button"
@@ -223,42 +299,49 @@ export default function ChatScreen() {
       </KeyboardAvoidingView>
 
       {/* ---- UC-AI-02: lịch sử hội thoại ---- */}
-      <Modal visible={historyOpen} transparent animationType="slide" onRequestClose={() => setHistoryOpen(false)}>
-        <Pressable style={styles.backdrop} onPress={() => setHistoryOpen(false)} />
-        <View style={styles.sheet}>
-          <View style={styles.sheetHandle} />
+      <BottomSheet visible={historyOpen} onClose={() => setHistoryOpen(false)}>
           <Text style={styles.sheetTitle}>Các phiên tư vấn trước</Text>
           <Text style={styles.sheetHint}>
             Hội thoại được lưu trên máy chủ nên mở lại lúc nào cũng còn nguyên mạch tư vấn.
           </Text>
-          {pastSessions.map((s) => (
-            <Pressable
-              key={s.id}
-              accessibilityRole="button"
-              onPress={() => setHistoryOpen(false)}
-              style={styles.sessionRow}
-            >
-              <View style={styles.sessionIcon}>
-                <Ionicons name="chatbubble-ellipses-outline" size={18} color={colors.primary} />
-              </View>
-              <View style={styles.flex}>
-                <Text style={styles.sessionTitle} numberOfLines={1}>
-                  {s.title}
-                </Text>
-                <Text style={styles.sessionMeta}>
-                  {s.at} · {s.count} sản phẩm được gợi ý
-                </Text>
-              </View>
-              <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
-            </Pressable>
-          ))}
-        </View>
-      </Modal>
+
+          {sessionsError ? (
+            <Text style={styles.sheetEmpty}>{sessionsError}</Text>
+          ) : sessions === null ? (
+            <ActivityIndicator size="small" color={colors.primary} style={styles.sheetLoading} />
+          ) : sessions.length === 0 ? (
+            <Text style={styles.sheetEmpty}>Chưa có phiên tư vấn nào được lưu.</Text>
+          ) : (
+            // Danh sách phải cuộn được trong sheet có trần chiều cao — nhiều phiên mà
+            // để View thường thì sheet tràn khỏi màn hình, các phiên cũ không bấm được.
+            <ScrollView showsVerticalScrollIndicator={false}>
+              {sessions.map((s) => (
+                <Pressable
+                  key={s.id}
+                  accessibilityRole="button"
+                  onPress={() => openSession(s.id)}
+                  style={styles.sessionRow}
+                >
+                  <View style={styles.sessionIcon}>
+                    <Ionicons name="chatbubble-ellipses-outline" size={18} color={colors.primary} />
+                  </View>
+                  <View style={styles.flex}>
+                    <Text style={styles.sessionTitle} numberOfLines={1}>
+                      {s.title ?? 'Phiên tư vấn'}
+                    </Text>
+                    <Text style={styles.sessionMeta}>{formatDate(s.started_at)}</Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
+                </Pressable>
+              ))}
+            </ScrollView>
+          )}
+      </BottomSheet>
     </Screen>
   );
 }
 
-function MessageBubble({
+const MessageBubble = memo(function MessageBubble({
   message,
   onProductPress,
 }: {
@@ -269,9 +352,17 @@ function MessageBubble({
 
   return (
     <View style={[styles.msgWrap, isUser && styles.msgWrapUser]}>
-      <View style={[styles.bubble, isUser ? styles.bubbleUser : styles.bubbleBot]}>
-        <Text style={[styles.msgText, isUser && styles.msgTextUser]}>{message.content}</Text>
-      </View>
+      {/* Bong bóng của người dùng tô chuyển sắc, của trợ lý để trắng — hai bên khác
+          nhau rõ ràng ngay cả khi đọc lướt. */}
+      {isUser ? (
+        <Gradient colors={gradient.brand} style={[styles.bubble, styles.bubbleUser]}>
+          <Text style={[styles.msgText, styles.msgTextUser]}>{message.content}</Text>
+        </Gradient>
+      ) : (
+        <View style={[styles.bubble, styles.bubbleBot]}>
+          <Text style={styles.msgText}>{message.content}</Text>
+        </View>
+      )}
 
       {/* Sản phẩm AI gợi ý — bấm là mở thẳng trang chi tiết (bước cuối của luồng chính) */}
       {message.products?.length ? (
@@ -288,7 +379,7 @@ function MessageBubble({
               onPress={() => onProductPress(p.id)}
               style={styles.miniCard}
             >
-              <ProductThumb uri={null} icon={p.category?.icon} size={56} />
+              <ProductThumb uri={p.primary_image} icon={null} size={56} />
               <View style={styles.miniText}>
                 <Text style={styles.miniName} numberOfLines={2}>
                   {p.name}
@@ -301,7 +392,7 @@ function MessageBubble({
       ) : null}
     </View>
   );
-}
+});
 
 const styles = StyleSheet.create({
   flex: { flex: 1 },
@@ -312,27 +403,29 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
     backgroundColor: colors.surface,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+    borderBottomLeftRadius: radius.xl,
+    borderBottomRightRadius: radius.xl,
+    ...shadow.card,
+    // Bóng phải phủ lên danh sách tin nhắn bên dưới, nếu không bị che mất.
+    zIndex: 2,
   },
   avatar: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: colors.primary,
+    width: 38,
+    height: 38,
+    borderRadius: 19,
     alignItems: 'center',
     justifyContent: 'center',
   },
   headerText: { flex: 1 },
-  headerTitle: { fontSize: 15, fontWeight: '700', color: colors.text },
+  headerTitle: { fontSize: 16, fontWeight: '700', color: colors.text },
   headerSub: { fontSize: 11, color: colors.textMuted, marginTop: 1 },
 
   list: { padding: spacing.lg, gap: spacing.lg },
   msgWrap: { gap: spacing.sm, alignItems: 'flex-start' },
   msgWrapUser: { alignItems: 'flex-end' },
-  bubble: { maxWidth: '86%', paddingHorizontal: spacing.lg, paddingVertical: spacing.md, borderRadius: radius.lg },
+  bubble: { maxWidth: '86%', paddingHorizontal: spacing.lg, paddingVertical: spacing.md, borderRadius: radius.xl },
   bubbleBot: { backgroundColor: colors.surface, borderTopLeftRadius: radius.sm, ...shadow.card },
-  bubbleUser: { backgroundColor: colors.primary, borderTopRightRadius: radius.sm },
+  bubbleUser: { borderTopRightRadius: radius.sm },
   msgText: { fontSize: 14, lineHeight: 21, color: colors.text },
   msgTextUser: { color: colors.textInverse },
 
@@ -345,8 +438,7 @@ const styles = StyleSheet.create({
     padding: spacing.sm,
     backgroundColor: colors.surface,
     borderRadius: radius.lg,
-    borderWidth: 1,
-    borderColor: colors.border,
+    ...shadow.card,
   },
   miniText: { flex: 1, gap: 2 },
   miniName: { fontSize: 12, color: colors.text, lineHeight: 17 },
@@ -355,7 +447,16 @@ const styles = StyleSheet.create({
   thinking: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingVertical: spacing.md },
   thinkingText: { fontSize: 13, color: colors.textMuted },
 
-  suggestions: { paddingHorizontal: spacing.lg, paddingBottom: spacing.md, gap: spacing.sm },
+  // flexGrow:0 để dải chip chỉ cao bằng nội dung: ScrollView của React Native mặc
+  // định có flexGrow:1, để nguyên thì nó giành hết chỗ trống rồi kéo từng chip cao
+  // theo, mà chip bo góc pill nên phình thành hình tròn.
+  suggestionsBar: { flexGrow: 0 },
+  suggestions: {
+    paddingHorizontal: spacing.lg,
+    paddingBottom: spacing.md,
+    gap: spacing.sm,
+    alignItems: 'center',
+  },
   suggestionChip: {
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.sm,
@@ -373,30 +474,38 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
     backgroundColor: colors.surface,
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
+    borderTopLeftRadius: radius.xl,
+    borderTopRightRadius: radius.xl,
+    ...shadow.raised,
   },
   input: {
     flex: 1,
     maxHeight: 110,
-    minHeight: 42,
+    minHeight: 46,
     fontSize: 15,
     color: colors.text,
-    backgroundColor: colors.bg,
-    borderRadius: radius.lg,
+    backgroundColor: colors.surfaceAlt,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.xl,
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.md,
     paddingBottom: spacing.md,
   },
   sendBtn: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
+    width: 46,
+    height: 46,
+    borderRadius: 23,
     backgroundColor: colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
+    shadowColor: colors.primaryDark,
+    shadowOpacity: 0.3,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 4,
   },
-  sendBtnOff: { backgroundColor: colors.borderStrong },
+  sendBtnOff: { backgroundColor: colors.borderStrong, shadowOpacity: 0, elevation: 0 },
   counter: {
     fontSize: 11,
     color: colors.textMuted,
@@ -406,30 +515,15 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
   },
 
-  backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.35)' },
-  sheet: {
-    backgroundColor: colors.surface,
-    borderTopLeftRadius: radius.xl,
-    borderTopRightRadius: radius.xl,
-    padding: spacing.lg,
-    paddingBottom: spacing.xxl,
-    ...shadow.raised,
-  },
-  sheetHandle: {
-    width: 40,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: colors.borderStrong,
-    alignSelf: 'center',
-    marginBottom: spacing.lg,
-  },
   sheetTitle: { fontSize: 18, fontWeight: '700', color: colors.text },
+  sheetEmpty: { fontSize: 13, color: colors.textMuted, paddingVertical: spacing.lg },
+  sheetLoading: { paddingVertical: spacing.lg },
   sheetHint: { fontSize: 13, color: colors.textMuted, marginTop: spacing.xs, marginBottom: spacing.lg, lineHeight: 19 },
   sessionRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingVertical: spacing.md },
   sessionIcon: {
-    width: 38,
-    height: 38,
-    borderRadius: radius.md,
+    width: 40,
+    height: 40,
+    borderRadius: radius.lg,
     backgroundColor: colors.primarySoft,
     alignItems: 'center',
     justifyContent: 'center',

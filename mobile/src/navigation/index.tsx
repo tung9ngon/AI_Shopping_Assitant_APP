@@ -1,11 +1,12 @@
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { Ionicons } from '@expo/vector-icons';
-import { Platform, StyleSheet, View } from 'react-native';
+import Ionicons from '@react-native-vector-icons/ionicons/static';
+import { StyleSheet, View } from 'react-native';
 
+import Gradient from '../components/Gradient';
 import { useCart } from '../context/CartContext';
-import { colors, shadow, tabBarHeight } from '../theme';
+import { colors, gradient, radius, shadow, useTabBarHeight, tabBarContentHeight } from '../theme';
 import type { RootStackParamList, TabParamList } from './types';
 
 import HomeScreen from '../screens/home/HomeScreen';
@@ -22,6 +23,15 @@ import PriceAlertsScreen from '../screens/orders/PriceAlertsScreen';
 import AccountScreen from '../screens/account/AccountScreen';
 import LoginScreen from '../screens/auth/LoginScreen';
 import RegisterScreen from '../screens/auth/RegisterScreen';
+import ForgotPasswordScreen from '../screens/auth/ForgotPasswordScreen';
+import AddressBookScreen from '../screens/account/AddressBookScreen';
+import AddressFormScreen from '../screens/account/AddressFormScreen';
+import ProfileScreen from '../screens/account/ProfileScreen';
+import PreferencesScreen from '../screens/account/PreferencesScreen';
+import ReviewsScreen from '../screens/products/ReviewsScreen';
+import WriteReviewScreen from '../screens/products/WriteReviewScreen';
+import PayosPaymentScreen from '../screens/checkout/PayosPaymentScreen';
+import PaymentResultScreen from '../screens/checkout/PaymentResultScreen';
 
 const Tab = createBottomTabNavigator<TabParamList>();
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -29,15 +39,27 @@ const Stack = createNativeStackNavigator<RootStackParamList>();
 // Nút trợ lý AI ở giữa thanh tab được vẽ nổi lên — mục 3.1.b của tài liệu giới thiệu
 // coi trò chuyện là giao diện chính của sản phẩm, không phải widget phụ như bản web.
 function ChatTabIcon({ focused }: { focused: boolean }) {
+  // Đang mở thì nút tô chuyển sắc, không mở thì xám đặc — nút nổi giữa thanh tab là
+  // điểm nhấn của cả app, đổi màu thôi chưa đủ để thấy nó đang được chọn.
+  if (focused) {
+    return (
+      <Gradient colors={gradient.brand} style={[styles.chatBubble, styles.chatBubbleActive]}>
+        <Ionicons name="chatbubble-ellipses" size={22} color={colors.textInverse} />
+      </Gradient>
+    );
+  }
   return (
-    <View style={[styles.chatBubble, focused && styles.chatBubbleActive]}>
-      <Ionicons name="sparkles" size={22} color={colors.textInverse} />
+    <View style={styles.chatBubble}>
+      <Ionicons name="chatbubble-ellipses" size={22} color={colors.textInverse} />
     </View>
   );
 }
 
 function MainTabs() {
   const { itemCount } = useCart();
+  // Đáy thanh tab đắp đúng inset của máy (home indicator / thanh gesture) thay vì
+  // số cứng theo nền tảng — xem chú thích ở theme/index.ts.
+  const tabBarHeight = useTabBarHeight();
 
   return (
     <Tab.Navigator
@@ -45,7 +67,10 @@ function MainTabs() {
         headerShown: false,
         tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.textMuted,
-        tabBarStyle: styles.tabBar,
+        tabBarStyle: [
+          styles.tabBar,
+          { height: tabBarHeight, paddingBottom: tabBarHeight - tabBarContentHeight },
+        ],
         tabBarLabelStyle: styles.tabLabel,
       }}
     >
@@ -105,6 +130,11 @@ export default function RootNavigator() {
           headerStyle: { backgroundColor: colors.surface },
           headerTitleStyle: { fontSize: 16, fontWeight: '700', color: colors.text },
           headerTintColor: colors.text,
+          // iOS lấy tiêu đề màn TRƯỚC làm nhãn nút quay lại. Màn 'Tabs' không đặt
+          // tiêu đề (nó ẩn header) nên nhãn rơi về tên route và hiện chữ "Tabs".
+          // Đặt cứng một nhãn dùng chung: cùng một màn chi tiết có thể mở từ nhiều
+          // tab khác nhau, nên không có tiêu đề nào đúng cho mọi đường vào.
+          headerBackTitle: 'Quay lại',
           contentStyle: { backgroundColor: colors.bg },
         }}
       >
@@ -138,6 +168,39 @@ export default function RootNavigator() {
         />
         <Stack.Screen name="Login" component={LoginScreen} options={{ headerShown: false }} />
         <Stack.Screen name="Register" component={RegisterScreen} options={{ title: 'Đăng ký' }} />
+        <Stack.Screen
+          name="ForgotPassword"
+          component={ForgotPasswordScreen}
+          options={{ title: 'Quên mật khẩu' }}
+        />
+        <Stack.Screen name="AddressBook" component={AddressBookScreen} options={{ title: 'Sổ địa chỉ' }} />
+        <Stack.Screen
+          name="AddressForm"
+          component={AddressFormScreen}
+          options={({ route }) => ({ title: route.params?.addressId ? 'Sửa địa chỉ' : 'Thêm địa chỉ' })}
+        />
+        <Stack.Screen name="Profile" component={ProfileScreen} options={{ title: 'Hồ sơ cá nhân' }} />
+        <Stack.Screen
+          name="Preferences"
+          component={PreferencesScreen}
+          options={{ title: 'Sở thích mua sắm' }}
+        />
+        <Stack.Screen name="Reviews" component={ReviewsScreen} options={{ title: 'Đánh giá sản phẩm' }} />
+        <Stack.Screen
+          name="WriteReview"
+          component={WriteReviewScreen}
+          options={{ title: 'Viết đánh giá' }}
+        />
+        <Stack.Screen
+          name="PayosPayment"
+          component={PayosPaymentScreen}
+          options={{ title: 'Thanh toán PayOS', headerBackVisible: false }}
+        />
+        <Stack.Screen
+          name="PaymentResult"
+          component={PaymentResultScreen}
+          options={{ title: 'Kết quả thanh toán', headerBackVisible: false }}
+        />
       </Stack.Navigator>
     </NavigationContainer>
   );
@@ -149,23 +212,34 @@ const styles = StyleSheet.create({
   // Cần chừa tối thiểu: icon 24 + nhãn 17 + padding trong của ô 10 = 51.
   tabBar: {
     backgroundColor: colors.surface,
-    borderTopColor: colors.border,
-    height: tabBarHeight,
+    // Bỏ đường kẻ mảnh, tách khỏi nội dung bằng đổ bóng hắt lên như các thanh cố
+    // định khác trong app (thanh đặt hàng, thanh tổng tiền).
+    borderTopWidth: 0,
+    borderTopLeftRadius: radius.xl,
+    borderTopRightRadius: radius.xl,
     paddingTop: 6,
-    paddingBottom: Platform.OS === 'ios' ? 30 : 8,
+    // height và paddingBottom đặt động trong MainTabs theo inset đáy của máy.
+    ...shadow.raised,
   },
   tabLabel: { fontSize: 11, lineHeight: 17, fontWeight: '600' },
   chatLabel: { marginTop: 2 },
   chatBubble: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    marginTop: -14,
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    marginTop: -15,
     backgroundColor: colors.textMuted,
     alignItems: 'center',
     justifyContent: 'center',
     ...shadow.card,
   },
-  chatBubbleActive: { backgroundColor: colors.primary },
+  chatBubbleActive: {
+    backgroundColor: 'transparent',
+    shadowColor: colors.primaryDark,
+    shadowOpacity: 0.35,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 5 },
+    elevation: 6,
+  },
   badge: { backgroundColor: colors.primary, fontSize: 10 },
 });
