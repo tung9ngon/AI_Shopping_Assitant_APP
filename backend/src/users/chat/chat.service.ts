@@ -22,7 +22,13 @@ const SEARCH_PRODUCTS: FunctionDeclaration = {
     properties: {
       query: {
         type: SchemaType.STRING,
-        description: 'Từ khoá tên sản phẩm, ví dụ: "laptop", "dell", "điện thoại"',
+        description:
+          'Từ khoá khớp TÊN sản phẩm — dùng cho tên/dòng máy cụ thể, ví dụ: "MacBook Air", "Galaxy S24". KHÔNG đặt loại sản phẩm chung chung ("đồng hồ", "laptop") vào đây — loại sản phẩm thì dùng tham số category.',
+      },
+      category: {
+        type: SchemaType.STRING,
+        description:
+          'Tên danh mục, phải là MỘT trong các danh mục liệt kê ở hướng dẫn hệ thống, ví dụ: "Đồng hồ", "Laptop". Dùng khi khách hỏi theo loại sản phẩm.',
       },
       brand: { type: SchemaType.STRING, description: 'Hãng, ví dụ: "Dell", "Asus"' },
       minPrice: { type: SchemaType.NUMBER, description: 'Giá tối thiểu (VNĐ)' },
@@ -55,12 +61,17 @@ export class ChatService {
       );
     }
 
-    const brands = await this.productService.findAllBrands();
+    const [brands, categories] = await Promise.all([
+      this.productService.findAllBrands(),
+      this.productService.findAllCategories(),
+    ]);
     const systemInstruction = `Bạn là trợ lý mua sắm của "AI Shop" - cửa hàng bán đồ điện tử (laptop, điện thoại, đồng hồ thông minh, phụ kiện...).
 Nhiệm vụ: tư vấn và gợi ý sản phẩm phù hợp nhu cầu của khách.
 Các hãng đang có: ${brands.length ? brands.join(', ') : 'đang cập nhật'}.
+Các danh mục đang có: ${categories.length ? categories.map((c) => c.name).join(', ') : 'đang cập nhật'}.
 QUY TẮC:
 - Khi khách hỏi về sản phẩm, nhu cầu, hoặc giá: LUÔN dùng công cụ search_products để tra sản phẩm THẬT rồi tư vấn dựa trên kết quả.
+- Khách hỏi theo LOẠI sản phẩm (kể cả gõ tiếng Việt không dấu, vd "dong ho deo tay") thì truyền tham số category với đúng tên danh mục ở trên; query chỉ dành cho tên/dòng máy cụ thể.
 - KHÔNG bịa ra sản phẩm không có trong kết quả tra cứu.
 - Trả lời NGẮN GỌN, thân thiện, bằng tiếng Việt. Giá tính bằng VNĐ.
 - Nếu không tìm thấy sản phẩm phù hợp, gợi ý khách thử từ khoá/khoảng giá khác.`;
@@ -93,7 +104,7 @@ QUY TẮC:
         const functionResponses = [];
         for (const call of calls) {
           if (call.name === 'search_products') {
-            const found = await this.searchProducts(call.args as any);
+            const found = await this.searchProducts(call.args as any, categories);
             products = found;
             functionResponses.push({
               functionResponse: {
@@ -125,14 +136,25 @@ QUY TẮC:
     }
   }
 
-  private async searchProducts(args: {
-    query?: string;
-    brand?: string;
-    minPrice?: number;
-    maxPrice?: number;
-  }) {
+  private async searchProducts(
+    args: {
+      query?: string;
+      category?: string;
+      brand?: string;
+      minPrice?: number;
+      maxPrice?: number;
+    },
+    categories: { id: string; name: string }[],
+  ) {
+    // Gemini truyền TÊN danh mục — đổi sang id cho findAll. Tên không khớp danh mục
+    // nào thì bỏ qua bộ lọc (còn query/giá) thay vì ép ra 0 kết quả.
+    const categoryId = args.category
+      ? categories.find((c) => c.name.toLowerCase() === args.category?.toLowerCase())?.id
+      : undefined;
+
     const res = await this.productService.findAll({
       search: args.query,
+      categoryId,
       brand: args.brand,
       minPrice: args.minPrice,
       maxPrice: args.maxPrice,
