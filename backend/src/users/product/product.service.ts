@@ -56,7 +56,11 @@ export class ProductService {
       .where('product.is_active = true');
 
     if (search) {
-      qb.andWhere('product.name ILIKE :search', { search: `%${search}%` });
+      // Tên sản phẩm phần lớn là tiếng Anh ("Apple Watch...") trong khi khách gõ
+      // "đồng hồ" — khớp thêm tên danh mục để từ khoá tiếng Việt không ra 0 kết quả.
+      qb.andWhere('(product.name ILIKE :search OR category.name ILIKE :search)', {
+        search: `%${search}%`,
+      });
     }
     if (categoryId) {
       qb.andWhere('product.category_id = :categoryId', { categoryId });
@@ -126,6 +130,19 @@ export class ProductService {
       .orderBy('product.brand', 'ASC')
       .getRawMany<{ brand: string }>();
     return rows.map((r) => r.brand);
+  }
+
+  /** Danh mục đang có sản phẩm active — ChatService dùng cho tool search_products */
+  async findAllCategories(): Promise<{ id: string; name: string }[]> {
+    return this.productRepo
+      .createQueryBuilder('product')
+      .innerJoin('product.category', 'category')
+      .select('category.id', 'id')
+      .addSelect('category.name', 'name')
+      .distinct(true)
+      .where('product.is_active = true')
+      .orderBy('category.name', 'ASC')
+      .getRawMany<{ id: string; name: string }>();
   }
 
   // ---------- GET /api/products/:id ----------
