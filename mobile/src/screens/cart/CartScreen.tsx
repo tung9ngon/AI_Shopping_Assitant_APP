@@ -27,12 +27,27 @@ type Nav = NativeStackNavigationProp<RootStackParamList>;
 export default function CartScreen() {
   const navigation = useNavigation<Nav>();
   const { isAuthenticated, restoring } = useAuth();
-  const { cart, updateQuantity, remove, loading, error, reload } = useCart();
+  const {
+    cart,
+    updateQuantity,
+    remove,
+    loading,
+    error,
+    reload,
+    selectedItems,
+    selectedSubtotal,
+    isSelected,
+    toggleSelected,
+    setAllSelected,
+  } = useCart();
 
-  const shippingFee = baseShippingFee(cart.subtotal);
+  // Mọi con số dưới đây tính trên các dòng ĐANG TICK, không phải cả giỏ: bỏ tick một
+  // món thì tạm tính, phí ship và tổng tiền đều phải bỏ món đó ra.
+  const shippingFee = baseShippingFee(selectedSubtotal);
   const freeShip = shippingFee === 0;
-  const missingForFreeShip = FREE_SHIPPING_THRESHOLD - cart.subtotal;
-  const shipProgress = Math.min(1, cart.subtotal / FREE_SHIPPING_THRESHOLD);
+  const missingForFreeShip = FREE_SHIPPING_THRESHOLD - selectedSubtotal;
+  const shipProgress = Math.min(1, selectedSubtotal / FREE_SHIPPING_THRESHOLD);
+  const allSelected = cart.items.length > 0 && selectedItems.length === cart.items.length;
 
   // Mọi thao tác đều gọi API rồi tải lại giỏ — hỏng thì phải báo, không nuốt lỗi.
   const guard = async (action: () => Promise<void>) => {
@@ -125,13 +140,37 @@ export default function CartScreen() {
         </View>
       </View>
 
+      <Pressable
+        accessibilityRole="checkbox"
+        accessibilityState={{ checked: allSelected }}
+        onPress={() => setAllSelected(!allSelected)}
+        style={styles.selectAllRow}
+      >
+        <Checkbox checked={allSelected} />
+        <Text style={styles.selectAllLabel}>Chọn tất cả</Text>
+        <Text style={styles.selectAllCount}>
+          Đã chọn {selectedItems.length}/{cart.items.length}
+        </Text>
+      </Pressable>
+
       <FlatList
         data={cart.items}
         keyExtractor={(it) => it.id}
         contentContainerStyle={styles.list}
         showsVerticalScrollIndicator={false}
+        extraData={selectedItems}
         renderItem={({ item }) => (
           <View style={styles.row}>
+            <Pressable
+              accessibilityRole="checkbox"
+              accessibilityLabel={`Chọn ${item.product.name}`}
+              accessibilityState={{ checked: isSelected(item.id) }}
+              onPress={() => toggleSelected(item.id)}
+              hitSlop={6}
+              style={styles.rowCheck}
+            >
+              <Checkbox checked={isSelected(item.id)} />
+            </Pressable>
             <View style={styles.thumbBox}>
               <ProductThumb uri={item.product.image} size={72} style={styles.thumb} />
             </View>
@@ -162,7 +201,7 @@ export default function CartScreen() {
 
       {/* ---- Thanh tổng tiền ---- */}
       <View style={styles.footer}>
-        <SummaryRow label="Tạm tính" value={formatVND(cart.subtotal)} />
+        <SummaryRow label="Tạm tính" value={formatVND(selectedSubtotal)} />
         <SummaryRow
           label="Phí vận chuyển"
           value={freeShip ? 'Miễn phí' : formatVND(shippingFee)}
@@ -170,15 +209,28 @@ export default function CartScreen() {
         />
         {/* Số hiện trước cho người mua ước lượng; tiền thật do backend chốt lúc đặt
             hàng, sau khi trừ mã giảm giá chọn ở màn Đặt hàng. */}
-        <GrandTotalRow value={formatVND(cart.subtotal + shippingFee)} />
+        <GrandTotalRow value={formatVND(selectedSubtotal + shippingFee)} />
         <AppButton
-          title="Tiến hành đặt hàng"
+          title={
+            selectedItems.length > 0
+              ? `Tiến hành đặt hàng (${selectedItems.length})`
+              : 'Tiến hành đặt hàng'
+          }
           block
+          disabled={selectedItems.length === 0}
           onPress={() => navigation.navigate('Checkout')}
           style={{ marginTop: spacing.md }}
         />
       </View>
     </Screen>
+  );
+}
+
+function Checkbox({ checked }: { checked: boolean }) {
+  return (
+    <View style={[styles.checkbox, checked && styles.checkboxOn]}>
+      {checked ? <Ionicons name="checkmark" size={13} color={colors.textInverse} /> : null}
+    </View>
   );
 }
 
@@ -226,15 +278,39 @@ const styles = StyleSheet.create({
   shipFill: { height: 5, borderRadius: radius.pill, backgroundColor: colors.primary },
   shipFillOk: { backgroundColor: colors.success },
 
+  checkbox: {
+    width: 22,
+    height: 22,
+    borderRadius: radius.sm,
+    borderWidth: 1.5,
+    borderColor: colors.borderStrong,
+    backgroundColor: colors.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  checkboxOn: { backgroundColor: colors.primary, borderColor: colors.primary },
+
+  selectAllRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.md,
+  },
+  selectAllLabel: { flex: 1, fontSize: 13.5, fontWeight: '600', color: colors.text },
+  selectAllCount: { fontSize: 12.5, color: colors.textMuted },
+
   list: { padding: spacing.lg, gap: spacing.md },
   row: {
     flexDirection: 'row',
+    alignItems: 'center',
     gap: spacing.md,
     padding: spacing.md,
     backgroundColor: colors.surface,
     borderRadius: radius.xl,
     ...shadow.card,
   },
+  rowCheck: { padding: 2 },
   thumbBox: { backgroundColor: colors.surfaceAlt, borderRadius: radius.lg, overflow: 'hidden' },
   thumb: { borderRadius: radius.lg },
   rowBody: { flex: 1, gap: spacing.xs },

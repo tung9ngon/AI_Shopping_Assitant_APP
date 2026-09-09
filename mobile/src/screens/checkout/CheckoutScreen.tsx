@@ -56,7 +56,7 @@ const PAYMENT_OPTIONS: {
 export default function CheckoutScreen() {
   const navigation = useNavigation<Nav>();
   const route = useRoute<RouteProp<RootStackParamList, 'Checkout'>>();
-  const { cart, reload: reloadCart } = useCart();
+  const { selectedItems, selectedSubtotal, reload: reloadCart } = useCart();
   const { addresses, defaultAddress } = useAccount();
 
   const [addressId, setAddressId] = useState<string | null>(null);
@@ -74,8 +74,10 @@ export default function CheckoutScreen() {
 
   const address = addresses.find((a) => a.id === addressId) ?? defaultAddress;
 
+  // Chỉ tính trên các dòng đã tick ở màn Giỏ hàng — đây cũng đúng phần được gửi lên
+  // POST /orders, phần còn lại ở nguyên trong giỏ.
   const totals = useMemo(() => {
-    const subtotal = cart.subtotal;
+    const subtotal = selectedSubtotal;
     const baseShipping = baseShippingFee(subtotal);
     const orderDiscount = computeDiscount(orderVoucher, subtotal);
     const shipDiscount = computeDiscount(shipVoucher, subtotal, baseShipping);
@@ -86,7 +88,7 @@ export default function CheckoutScreen() {
       shipDiscount,
       total: Math.max(0, subtotal - orderDiscount + baseShipping - shipDiscount),
     };
-  }, [cart.subtotal, orderVoucher, shipVoucher]);
+  }, [selectedSubtotal, orderVoucher, shipVoucher]);
 
   const voucherCount = (orderVoucher ? 1 : 0) + (shipVoucher ? 1 : 0);
 
@@ -97,6 +99,7 @@ export default function CheckoutScreen() {
       // Mã sai/hết hạn thì backend tự từ chối khi tạo đơn.
       const order = await orderApi.create({
         address_id: address.id,
+        cart_item_ids: selectedItems.map((item) => item.id),
         discount_code: orderVoucher?.code ?? undefined,
         freeship_code: shipVoucher?.code ?? undefined,
       });
@@ -167,8 +170,8 @@ export default function CheckoutScreen() {
         </Pressable>
 
         {/* ---- Sản phẩm ---- */}
-        <Card title={`Sản phẩm (${cart.items.length})`} style={styles.card}>
-          {cart.items.map((item, i) => (
+        <Card title={`Sản phẩm (${selectedItems.length})`} style={styles.card}>
+          {selectedItems.map((item, i) => (
             <View key={item.id} style={[styles.itemRow, i > 0 && styles.itemRowBorder]}>
               <ProductThumb uri={item.product.image} icon={null} size={48} />
               <View style={styles.flex}>
@@ -189,7 +192,7 @@ export default function CheckoutScreen() {
           accessibilityRole="button"
           onPress={() =>
             navigation.navigate('VoucherPicker', {
-              subtotal: cart.subtotal,
+              subtotal: selectedSubtotal,
               orderVoucherCode: orderVoucher?.code ?? null,
               shipVoucherCode: shipVoucher?.code ?? null,
             })
@@ -266,7 +269,7 @@ export default function CheckoutScreen() {
           title="Đặt hàng"
           onPress={placeOrder}
           loading={placing}
-          disabled={cart.items.length === 0 || !address}
+          disabled={selectedItems.length === 0 || !address}
           style={styles.placeBtn}
         />
       </View>

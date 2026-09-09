@@ -1,5 +1,5 @@
 // UC-PROD-01 — Dạo trang chủ cửa hàng.
-import { useMemo } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import {
   FlatList,
   Pressable,
@@ -7,11 +7,12 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   useWindowDimensions,
   View,
 } from 'react-native';
 import Ionicons from '@react-native-vector-icons/ionicons/static';
-import { useNavigation } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
@@ -25,6 +26,8 @@ import { ProductGridSkeleton, ProductRailSkeleton, Skeleton } from '../../compon
 import { useApi } from '../../hooks/useApi';
 import { categoryApi } from '../../api/categories';
 import { productApi } from '../../api/products';
+import { notificationApi } from '../../api/notifications';
+import { useAuth } from '../../context/AuthContext';
 import { colors, gradient, radius, shadow, spacing, useTabBarHeight } from '../../theme';
 import { getItems } from '../../types';
 import type { RootStackParamList } from '../../navigation/types';
@@ -68,10 +71,33 @@ export default function HomeScreen() {
     [],
   );
 
+  // Chấm đỏ trên nút chuông phải phản ánh số thật, không phải chấm vẽ cứng như
+  // trước. Tab Home không unmount nên phải nạp lại mỗi lần quay về, nếu không đọc
+  // xong thông báo rồi chấm vẫn còn.
+  const { isAuthenticated } = useAuth();
+  const unread = useApi(
+    (signal) =>
+      isAuthenticated ? notificationApi.unreadCount(signal) : Promise.resolve({ count: 0 }),
+    [isAuthenticated],
+  );
+  const unreadCount = unread.data?.count ?? 0;
+  const reloadUnread = unread.reload;
+  useFocusEffect(
+    useCallback(() => {
+      reloadUnread();
+    }, [reloadUnread]),
+  );
+
   // Lưới 2 cột: trừ lề trái/phải và khoảng cách giữa hai cột.
   const cardWidth = useMemo(() => (width - spacing.lg * 2 - spacing.md) / 2, [width]);
 
   const openProduct = (productId: string) => navigation.navigate('ProductDetail', { productId });
+
+  // Từ khoá gõ ở trang chủ chỉ đi kèm lượt chuyển tab, không tự gọi API ở đây —
+  // màn Sản phẩm mới là nơi tìm kiếm. Bỏ trống thì vẫn sang, chỉ là không lọc.
+  const [keyword, setKeyword] = useState('');
+  const submitSearch = () =>
+    navigation.navigate('Tabs', { screen: 'Products', params: { keyword: keyword.trim() } });
 
   return (
     <Screen edges={[]} style={styles.screen}>
@@ -105,23 +131,36 @@ export default function HomeScreen() {
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel="Thông báo"
+                onPress={() => navigation.navigate('Notifications')}
                 style={({ pressed }) => [styles.iconBtn, pressed && styles.iconBtnPressed]}
                 hitSlop={6}
               >
                 <Ionicons name="notifications-outline" size={21} color={colors.textInverse} />
-                <View style={styles.dot} />
+                {unreadCount > 0 ? <View style={styles.dot} /> : null}
               </Pressable>
             </View>
 
-            <Pressable
-              accessibilityRole="search"
-              accessibilityLabel="Tìm sản phẩm"
-              onPress={() => navigation.navigate('Tabs', { screen: 'Products' })}
-              style={({ pressed }) => [styles.searchBar, pressed && styles.searchBarPressed]}
-            >
+            {/* Ô nhập thật, không phải nút mở tab Sản phẩm: gõ xong bấm Tìm là sang
+                thẳng danh sách đã lọc theo từ khoá (tuyến Products nhận tham số
+                `keyword`). Trước đây bấm vào chỉ chuyển tab rồi phải gõ lại. */}
+            <View style={styles.searchBar}>
               <Ionicons name="search" size={18} color={colors.primary} />
-              <Text style={styles.searchHint}>Tìm laptop, điện thoại, tai nghe…</Text>
-            </Pressable>
+              <TextInput
+                value={keyword}
+                onChangeText={setKeyword}
+                onSubmitEditing={submitSearch}
+                placeholder="Tìm laptop, điện thoại, tai nghe…"
+                placeholderTextColor={colors.textMuted}
+                style={styles.searchInput}
+                returnKeyType="search"
+                accessibilityLabel="Ô tìm sản phẩm"
+              />
+              {keyword ? (
+                <Pressable onPress={() => setKeyword('')} hitSlop={8} accessibilityLabel="Xoá từ khoá">
+                  <Ionicons name="close-circle" size={18} color={colors.textMuted} />
+                </Pressable>
+              ) : null}
+            </View>
           </View>
         </Gradient>
 
@@ -331,8 +370,7 @@ const styles = StyleSheet.create({
     marginTop: spacing.sm,
     ...shadow.float,
   },
-  searchBarPressed: { backgroundColor: colors.surfaceAlt },
-  searchHint: { fontSize: 14, color: colors.textMuted },
+  searchInput: { flex: 1, fontSize: 14, color: colors.text, paddingVertical: 0 },
 
   categoryRow: {
     flexDirection: 'row',

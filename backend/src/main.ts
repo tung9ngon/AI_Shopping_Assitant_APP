@@ -24,6 +24,8 @@ import { ConversationModule } from './users/conversation/conversation.module';
 import { AddressModule } from './users/address/address.module'
 import { ProfileModule } from './users/profile/profile.module';
 import { AdminStatisticsModule } from './admin/statistics/statistics.admin.module';
+import { NotificationModule } from './users/notification/notification.module';
+import { PlaceModule } from './users/place/place.module';
 
 @Module({
   imports: [
@@ -73,6 +75,8 @@ import { AdminStatisticsModule } from './admin/statistics/statistics.admin.modul
     AddressModule,
     ProfileModule,
     AdminStatisticsModule,
+    NotificationModule,
+    PlaceModule,
   ],
 })
 class AppModule {}

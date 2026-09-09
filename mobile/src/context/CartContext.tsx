@@ -18,7 +18,7 @@ import {
 import { cartApi } from '../api/cart';
 import { getErrorMessage } from '../api/client';
 import { useAuth } from './AuthContext';
-import type { Cart, Product } from '../types';
+import type { Cart, CartItem, Product } from '../types';
 
 const EMPTY_CART: Cart = { id: '', items: [], subtotal: 0 };
 
@@ -35,6 +35,13 @@ interface CartContextValue {
   add: (product: Product, quantity: number) => Promise<void>;
   updateQuantity: (itemId: string, quantity: number) => Promise<void>;
   remove: (itemId: string) => Promise<void>;
+  // Các dòng đang được tick ở màn Giỏ hàng — đơn hàng chỉ gồm bấy nhiêu, và mọi con
+  // số tiền hiện cho người mua đều tính trên bấy nhiêu.
+  selectedItems: CartItem[];
+  selectedSubtotal: number;
+  isSelected: (itemId: string) => boolean;
+  toggleSelected: (itemId: string) => void;
+  setAllSelected: (selected: boolean) => void;
 }
 
 const CartContext = createContext<CartContextValue | null>(null);
@@ -149,9 +156,66 @@ export function CartProvider({ children }: { children: ReactNode }) {
     [cart],
   );
 
+  // Lưu các dòng BỊ BỎ TICK chứ không lưu các dòng được tick: giỏ tải lại liên tục
+  // (mỗi lần đổi số lượng là một GET /cart), giữ danh sách bỏ tick thì hàng mới thêm
+  // vào mặc định có tick và dòng đã xoá tự rơi khỏi phép tính — không phải đồng bộ
+  // tay sau mỗi lượt tải.
+  const [deselected, setDeselected] = useState<Set<string>>(new Set());
+
+  const selectedItems = useMemo(
+    () => cart.items.filter((it) => !deselected.has(it.id)),
+    [cart.items, deselected],
+  );
+  const selectedSubtotal = useMemo(
+    () => selectedItems.reduce((sum, it) => sum + it.product.price * it.quantity, 0),
+    [selectedItems],
+  );
+  const isSelected = useCallback((itemId: string) => !deselected.has(itemId), [deselected]);
+  const toggleSelected = useCallback((itemId: string) => {
+    setDeselected((prev) => {
+      const next = new Set(prev);
+      if (next.has(itemId)) next.delete(itemId);
+      else next.add(itemId);
+      return next;
+    });
+  }, []);
+  const setAllSelected = useCallback(
+    (selected: boolean) =>
+      setDeselected(selected ? new Set() : new Set(cart.items.map((it) => it.id))),
+    [cart.items],
+  );
+
   const value = useMemo(
-    () => ({ cart, itemCount, loading, error, reload, add, updateQuantity, remove }),
-    [cart, itemCount, loading, error, reload, add, updateQuantity, remove],
+    () => ({
+      cart,
+      itemCount,
+      loading,
+      error,
+      reload,
+      add,
+      updateQuantity,
+      remove,
+      selectedItems,
+      selectedSubtotal,
+      isSelected,
+      toggleSelected,
+      setAllSelected,
+    }),
+    [
+      cart,
+      itemCount,
+      loading,
+      error,
+      reload,
+      add,
+      updateQuantity,
+      remove,
+      selectedItems,
+      selectedSubtotal,
+      isSelected,
+      toggleSelected,
+      setAllSelected,
+    ],
   );
 
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>;
