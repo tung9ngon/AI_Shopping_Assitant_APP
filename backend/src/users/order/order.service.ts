@@ -97,11 +97,25 @@ export class OrderService {
       const cart = await cartRepo.findOne({ where: { user_id: userId } });
       if (!cart) throw new BadRequestException('Giỏ hàng trống');
 
-      const cartItems = await cartItemRepo.find({
+      const allCartItems = await cartItemRepo.find({
         where: { cart_id: cart.id },
         relations: { product: true },
       });
-      if (!cartItems.length) throw new BadRequestException('Giỏ hàng trống');
+      if (!allCartItems.length) throw new BadRequestException('Giỏ hàng trống');
+
+      // Người mua tick chọn từng dòng ở màn Giỏ hàng: chỉ những dòng được gửi lên mới
+      // vào đơn, phần còn lại ở nguyên trong giỏ. Không gửi cart_item_ids = đặt cả giỏ
+      // (giữ nguyên hành vi cũ).
+      let cartItems = allCartItems;
+      if (dto.cart_item_ids?.length) {
+        const selected = new Set(dto.cart_item_ids);
+        cartItems = allCartItems.filter((item) => selected.has(item.id));
+        if (cartItems.length !== selected.size) {
+          throw new BadRequestException(
+            'Có sản phẩm đã chọn không còn trong giỏ hàng, vui lòng tải lại giỏ',
+          );
+        }
+      }
 
       for (const item of cartItems) {
         if (!item.product || !item.product.is_active) {
@@ -221,7 +235,8 @@ export class OrderService {
         await discountRepo.save(freeshipDiscount);
       }
 
-      await cartItemRepo.delete({ cart_id: cart.id });
+      // Chỉ xoá đúng những dòng đã lên đơn — dòng không tick vẫn phải nằm lại trong giỏ.
+      await cartItemRepo.delete({ id: In(cartItems.map((item) => item.id)) });
 
       return {
         id: savedOrder.id,

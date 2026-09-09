@@ -1,9 +1,10 @@
 // Nhóm /api/orders. Tất cả đều cần đăng nhập (JwtAccessGuard).
 //
-// POST /orders lấy hàng từ GIỎ TRÊN MÁY CHỦ, không nhận danh sách sản phẩm: app chỉ
-// gửi địa chỉ giao + mã giảm giá. Máy chủ tự tính tạm tính, phí ship, tiền giảm và
-// tổng — con số hiện trên màn Đặt hàng chỉ là bản xem trước, số trong phản hồi mới là
-// số chính thức. Đặt hàng xong backend xoá sạch giỏ, nên app phải tải lại giỏ.
+// POST /orders lấy hàng từ GIỎ TRÊN MÁY CHỦ, không nhận giá: app gửi địa chỉ giao, mã
+// giảm giá và danh sách dòng giỏ hàng được tick chọn (cart_item_ids). Máy chủ tự tính
+// tạm tính, phí ship, tiền giảm và tổng — con số hiện trên màn Đặt hàng chỉ là bản xem
+// trước, số trong phản hồi mới là số chính thức. Đặt hàng xong backend xoá đúng những
+// dòng đã lên đơn, nên app phải tải lại giỏ.
 //
 // Các cột tiền là bigint nên Postgres trả về chuỗi — chuẩn hoá về number tại đây.
 import { api } from './client';
@@ -53,6 +54,8 @@ export type CreatedOrder = Omit<OrderDetail, 'items' | 'note'>;
 
 export interface CreateOrderPayload {
   address_id: string;
+  // Các dòng giỏ hàng được tick chọn. Bỏ trống thì backend đặt cả giỏ.
+  cart_item_ids?: string[];
   // Mã giảm tiền hàng và mã miễn phí ship dùng song song, không được trùng nhau.
   discount_code?: string;
   freeship_code?: string;

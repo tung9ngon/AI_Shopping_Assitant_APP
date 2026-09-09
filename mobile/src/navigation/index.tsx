@@ -2,7 +2,7 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import Ionicons from '@react-native-vector-icons/ionicons/static';
-import { StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 
 import Gradient from '../components/Gradient';
 import { useCart } from '../context/CartContext';
@@ -20,6 +20,7 @@ import OrderSuccessScreen from '../screens/checkout/OrderSuccessScreen';
 import OrdersScreen from '../screens/orders/OrdersScreen';
 import OrderDetailScreen from '../screens/orders/OrderDetailScreen';
 import PriceAlertsScreen from '../screens/orders/PriceAlertsScreen';
+import NotificationsScreen from '../screens/notifications/NotificationsScreen';
 import AccountScreen from '../screens/account/AccountScreen';
 import LoginScreen from '../screens/auth/LoginScreen';
 import RegisterScreen from '../screens/auth/RegisterScreen';
@@ -121,6 +122,24 @@ function MainTabs() {
   );
 }
 
+// Hai màn kết quả (đặt hàng thành công / kết quả thanh toán) tắt nút back mặc định:
+// đơn đã tạo xong rồi, quay ngược về màn Đặt hàng hay màn quét QR đều vô nghĩa. Nhưng
+// bỏ hẳn nút thì thanh tiêu đề không còn đường thoát nào — đặt lại một nút, bấm vào
+// đưa về gốc ngăn xếp (các tab) thay vì lùi đúng một bước.
+function HeaderExitButton({ onPress }: { onPress: () => void }) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel="Đóng"
+      onPress={onPress}
+      hitSlop={8}
+      style={({ pressed }) => [styles.headerExit, pressed && styles.headerExitPressed]}
+    >
+      <Ionicons name="arrow-back" size={22} color={colors.text} />
+    </Pressable>
+  );
+}
+
 export default function RootNavigator() {
   return (
     <NavigationContainer>
@@ -130,11 +149,11 @@ export default function RootNavigator() {
           headerStyle: { backgroundColor: colors.surface },
           headerTitleStyle: { fontSize: 16, fontWeight: '700', color: colors.text },
           headerTintColor: colors.text,
-          // iOS lấy tiêu đề màn TRƯỚC làm nhãn nút quay lại. Màn 'Tabs' không đặt
-          // tiêu đề (nó ẩn header) nên nhãn rơi về tên route và hiện chữ "Tabs".
-          // Đặt cứng một nhãn dùng chung: cùng một màn chi tiết có thể mở từ nhiều
-          // tab khác nhau, nên không có tiêu đề nào đúng cho mọi đường vào.
-          headerBackTitle: 'Quay lại',
+          // iOS lấy tiêu đề màn TRƯỚC làm nhãn nút quay lại; màn 'Tabs' không đặt
+          // tiêu đề nên nhãn rơi về tên route và hiện chữ "Tabs". Bỏ hẳn phần chữ,
+          // chỉ để lại mũi tên — cùng một màn chi tiết mở được từ nhiều tab nên
+          // không có nhãn nào đúng cho mọi đường vào.
+          headerBackButtonDisplayMode: 'minimal',
           contentStyle: { backgroundColor: colors.bg },
         }}
       >
@@ -153,7 +172,11 @@ export default function RootNavigator() {
         <Stack.Screen
           name="OrderSuccess"
           component={OrderSuccessScreen}
-          options={{ title: 'Đặt hàng thành công', headerBackVisible: false }}
+          options={({ navigation }) => ({
+            title: 'Đặt hàng thành công',
+            headerBackVisible: false,
+            headerLeft: () => <HeaderExitButton onPress={() => navigation.popToTop()} />,
+          })}
         />
         <Stack.Screen name="Orders" component={OrdersScreen} options={{ title: 'Đơn hàng của tôi' }} />
         <Stack.Screen
@@ -165,6 +188,11 @@ export default function RootNavigator() {
           name="PriceAlerts"
           component={PriceAlertsScreen}
           options={{ title: 'Theo dõi giá' }}
+        />
+        <Stack.Screen
+          name="Notifications"
+          component={NotificationsScreen}
+          options={{ title: 'Thông báo' }}
         />
         <Stack.Screen name="Login" component={LoginScreen} options={{ headerShown: false }} />
         <Stack.Screen name="Register" component={RegisterScreen} options={{ title: 'Đăng ký' }} />
@@ -199,7 +227,11 @@ export default function RootNavigator() {
         <Stack.Screen
           name="PaymentResult"
           component={PaymentResultScreen}
-          options={{ title: 'Kết quả thanh toán', headerBackVisible: false }}
+          options={({ navigation }) => ({
+            title: 'Kết quả thanh toán',
+            headerBackVisible: false,
+            headerLeft: () => <HeaderExitButton onPress={() => navigation.popToTop()} />,
+          })}
         />
       </Stack.Navigator>
     </NavigationContainer>
@@ -242,4 +274,6 @@ const styles = StyleSheet.create({
     elevation: 6,
   },
   badge: { backgroundColor: colors.primary, fontSize: 10 },
+  headerExit: { padding: 4, marginLeft: -4, borderRadius: radius.pill },
+  headerExitPressed: { backgroundColor: colors.bg },
 });
