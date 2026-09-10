@@ -2,6 +2,11 @@
 
     <uses-permission android:name="android.permission.INTERNET" />
 
+    <!-- Chỉ dùng ở màn "Chọn trên bản đồ" để đặt sẵn ghim vào chỗ người dùng đang
+         đứng. Từ chối quyền thì bản đồ vẫn mở, chỉ là mở ở điểm mặc định. -->
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+
     <application
       android:name=".MainApplication"
       android:label="@string/app_name"

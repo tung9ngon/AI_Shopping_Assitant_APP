@@ -1,8 +1,11 @@
 // Thêm / sửa địa chỉ giao hàng. Không có tham số addressId = thêm mới.
 //
-// Ô địa chỉ gợi ý theo Goong Maps (GET /api/places/autocomplete, backend giữ khoá).
+// Hai đường điền ô địa chỉ: gõ chữ rồi chọn gợi ý (GET /api/places/autocomplete), hoặc
+// mở màn bản đồ kéo ghim tới đúng chỗ (màn LocationPicker trả chuỗi địa chỉ về đây).
+// Cả hai đều chạy trên dữ liệu OpenStreetMap qua Photon.
 // Chọn một gợi ý là điền nguyên chuỗi địa chỉ đó vào ô — vẫn cho sửa lại và vẫn cho gõ
-// tay hoàn toàn, vì gợi ý có thể thiếu số nhà/số phòng.
+// tay hoàn toàn. Điều này BẮT BUỘC chứ không phải tiện ích: dữ liệu OSM ở Việt Nam gần
+// như không có số nhà, gợi ý chỉ ra tới đường/phường nên người dùng phải tự thêm số nhà.
 //
 // Ràng buộc lấy đúng theo backend (users/address/address.dto.ts) để app không chặn
 // dữ liệu BE chấp nhận và ngược lại: địa chỉ tối đa 255 ký tự, tên người nhận tối đa
@@ -107,13 +110,30 @@ export default function AddressFormScreen() {
     };
   }, [fullAddress]);
 
+  // Toạ độ của gợi ý vừa chọn: mở màn bản đồ thì mở đúng ngay chỗ đó thay vì rơi về
+  // điểm mặc định, người dùng chỉ phải kéo một quãng ngắn để chỉnh cho chính xác.
+  const [pickedCoords, setPickedCoords] = useState<{ lat: number; lon: number } | null>(null);
+
   const pickSuggestion = (item: PlaceSuggestion) => {
     skipSuggest.current = true;
     setFullAddress(item.description.slice(0, MAX_ADDRESS));
     setSuggestions([]);
     setSuggestNote(null);
     setErrors((prev) => ({ ...prev, address: undefined }));
+    if (item.lat != null && item.lon != null) setPickedCoords({ lat: item.lat, lon: item.lon });
   };
+
+  // Màn bản đồ trả kết quả về qua tham số tuyến. Đặt cờ bỏ qua TRƯỚC khi điền ô, nếu
+  // không lượt gợi ý sẽ chạy ngay trên chính chuỗi vừa điền vào.
+  const pickedAddress = params?.pickedAddress;
+  useEffect(() => {
+    if (!pickedAddress) return;
+    skipSuggest.current = true;
+    setFullAddress(pickedAddress.slice(0, MAX_ADDRESS));
+    setSuggestions([]);
+    setSuggestNote(null);
+    setErrors((prev) => ({ ...prev, address: undefined }));
+  }, [pickedAddress]);
 
   const submit = async () => {
     const next: typeof errors = {};
@@ -229,9 +249,25 @@ export default function AddressFormScreen() {
             </View>
           ) : null}
 
-          <Text style={styles.counter}>
-            {fullAddress.length}/{MAX_ADDRESS} ký tự
-          </Text>
+          <View style={styles.addressFootRow}>
+            <Pressable
+              accessibilityRole="button"
+              onPress={() =>
+                navigation.navigate('LocationPicker', {
+                  addressId: params?.addressId,
+                  lat: pickedCoords?.lat,
+                  lon: pickedCoords?.lon,
+                })
+              }
+              style={({ pressed }) => [styles.mapBtn, pressed && styles.mapBtnPressed]}
+            >
+              <Ionicons name="map-outline" size={16} color={colors.primary} />
+              <Text style={styles.mapBtnText}>Chọn trên bản đồ</Text>
+            </Pressable>
+            <Text style={styles.counter}>
+              {fullAddress.length}/{MAX_ADDRESS} ký tự
+            </Text>
+          </View>
 
           <Pressable
             accessibilityRole="checkbox"
@@ -273,7 +309,27 @@ const styles = StyleSheet.create({
   scroll: { padding: spacing.lg, gap: spacing.lg },
 
   addressInput: { minHeight: 62, textAlignVertical: 'top', paddingTop: spacing.sm },
-  counter: { fontSize: 11.5, color: colors.textMuted, textAlign: 'right', marginTop: -spacing.md },
+  counter: { fontSize: 11.5, color: colors.textMuted, textAlign: 'right' },
+  addressFootRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: spacing.md,
+    marginTop: -spacing.md,
+  },
+  mapBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 6,
+    paddingHorizontal: spacing.md,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    borderColor: colors.primary,
+    backgroundColor: colors.surface,
+  },
+  mapBtnPressed: { backgroundColor: colors.primarySoft },
+  mapBtnText: { fontSize: 13, fontWeight: '700', color: colors.primary },
 
   suggestNoteRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: -spacing.md },
   suggestNote: { flex: 1, fontSize: 12, color: colors.textMuted, lineHeight: 17 },

@@ -1,7 +1,9 @@
-// Nhóm /api/places — gợi ý địa chỉ lấy từ Goong Maps, gọi qua backend.
+// Nhóm /api/places — gợi ý địa chỉ, backend lấy từ Photon (geocoder nền OpenStreetMap).
 //
-// App KHÔNG gọi thẳng Goong: khoá API nằm ở .env của máy chủ. Chưa khai GOONG_API_KEY
-// thì backend trả 503 kèm lời nhắn — màn thêm địa chỉ hiện lời nhắn đó và vẫn cho gõ tay.
+// Không cần khoá API. App vẫn gọi qua backend chứ không gọi thẳng Photon: máy chủ dồn
+// được lưu lượng về một nơi (Photon giới hạn mềm ~1 request/giây) và sau này đổi nhà
+// cung cấp thì chỉ sửa backend. Gợi ý hỏng vì mạng/dịch vụ thì màn thêm địa chỉ hiện
+// lời nhắn và vẫn cho gõ tay.
 import { api } from './client';
 
 export interface PlaceSuggestion {
@@ -10,9 +12,18 @@ export interface PlaceSuggestion {
   description: string;
   main_text: string | null;
   secondary_text: string | null;
+  // Toạ độ của gợi ý: dùng để mở màn bản đồ đúng ngay chỗ vừa chọn thay vì rơi về
+  // điểm mặc định. Null khi Photon không trả hình học cho bản ghi đó.
+  lat: number | null;
+  lon: number | null;
 }
 
 export const placeApi = {
   autocomplete: (input: string, signal?: AbortSignal) =>
     api.get<{ items: PlaceSuggestion[] }>('/places/autocomplete', { input }, { signal }),
+
+  // Thả ghim trên bản đồ -> chuỗi địa chỉ. `item` là null khi điểm đó không có gì
+  // trong dữ liệu OpenStreetMap (giữa ruộng, giữa biển) — không phải lỗi.
+  reverse: (lat: number, lon: number, signal?: AbortSignal) =>
+    api.get<{ item: PlaceSuggestion | null }>('/places/reverse', { lat, lon }, { signal }),
 };

@@ -50,11 +50,6 @@ export default () => ({
   checksumKey: process.env.PAYOS_CHECKSUM_KEY,
   },
 
-  goong: {
-    // Bản đồ / gợi ý địa chỉ (rsapi.goong.io). Không liên quan tới OAuth Google ở trên.
-    apiKey: process.env.GOONG_API_KEY,
-  },
-
   gemini: {
     apiKey: process.env.GEMINI_API_KEY,
     model: process.env.GEMINI_MODEL, // vd: gemini-1.5-flash, gemini-2.0-flash

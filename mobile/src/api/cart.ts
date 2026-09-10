@@ -18,8 +18,13 @@ export const cartApi = {
           product: { ...it.product, price: Number(it.product.price) },
         })),
       })),
+  // Trả về dòng giỏ vừa tạo (hoặc dòng cũ đã cộng dồn số lượng) — "Mua ngay" cần
+  // `id` của nó để đặt riêng đúng sản phẩm này.
   addItem: (productId: string, quantity = 1) =>
-    api.post<unknown>('/cart/items', { product_id: productId, quantity }),
+    api.post<{ id: string; product_id: string; quantity: number }>('/cart/items', {
+      product_id: productId,
+      quantity,
+    }),
   updateItem: (itemId: string, quantity: number) =>
     api.put<unknown>(`/cart/items/${itemId}`, { quantity }),
   removeItem: (itemId: string) => api.del<unknown>(`/cart/items/${itemId}`),

@@ -109,11 +109,10 @@ export default function ProductDetailScreen() {
   const addToCart = async () => {
     setAdding(true);
     try {
-      await add(product, quantity);
-      return true;
+      return await add(product, quantity);
     } catch (err) {
       Alert.alert('Chưa thêm được vào giỏ', getErrorMessage(err));
-      return false;
+      return null;
     } finally {
       setAdding(false);
     }
@@ -126,11 +125,15 @@ export default function ProductDetailScreen() {
     addedTimer.current = setTimeout(() => setAdded(false), 1800);
   };
 
+  // Giỏ nằm trên máy chủ nên "Mua ngay" vẫn phải đi qua giỏ, nhưng chuyển thẳng id
+  // dòng vừa thêm sang màn Đặt hàng: đơn chỉ gồm đúng sản phẩm này, hàng đang có sẵn
+  // trong giỏ ở nguyên đó.
   const handleBuyNow = async () => {
     setBuying(true);
     try {
-      if (!(await addToCart())) return;
-      navigation.navigate('Checkout');
+      const itemId = await addToCart();
+      if (!itemId) return;
+      navigation.navigate('Checkout', { buyNowItemId: itemId });
     } finally {
       setBuying(false);
     }

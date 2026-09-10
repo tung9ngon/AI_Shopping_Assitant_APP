@@ -27,6 +27,7 @@ import RegisterScreen from '../screens/auth/RegisterScreen';
 import ForgotPasswordScreen from '../screens/auth/ForgotPasswordScreen';
 import AddressBookScreen from '../screens/account/AddressBookScreen';
 import AddressFormScreen from '../screens/account/AddressFormScreen';
+import LocationPickerScreen from '../screens/account/LocationPickerScreen';
 import ProfileScreen from '../screens/account/ProfileScreen';
 import PreferencesScreen from '../screens/account/PreferencesScreen';
 import ReviewsScreen from '../screens/products/ReviewsScreen';
@@ -206,6 +207,11 @@ export default function RootNavigator() {
           name="AddressForm"
           component={AddressFormScreen}
           options={({ route }) => ({ title: route.params?.addressId ? 'Sửa địa chỉ' : 'Thêm địa chỉ' })}
+        />
+        <Stack.Screen
+          name="LocationPicker"
+          component={LocationPickerScreen}
+          options={{ title: 'Chọn trên bản đồ' }}
         />
         <Stack.Screen name="Profile" component={ProfileScreen} options={{ title: 'Hồ sơ cá nhân' }} />
         <Stack.Screen

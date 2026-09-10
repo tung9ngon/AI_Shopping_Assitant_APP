@@ -18,7 +18,15 @@ export type RootStackParamList = {
   // tuần tự hoá được — React Navigation cảnh báo nếu truyền hàm qua params).
   // Trả nguyên object mã đã chọn để Checkout tính được bản xem trước mà không phải
   // tải lại danh sách mã lần nữa.
-  Checkout: { orderVoucher?: DiscountCodeItem | null; shipVoucher?: DiscountCodeItem | null } | undefined;
+  // `buyNowItemId`: vào từ nút "Mua ngay" ở màn chi tiết — đơn chỉ gồm đúng dòng giỏ
+  // này, không kéo theo các dòng đang tick trong giỏ.
+  Checkout:
+    | {
+        orderVoucher?: DiscountCodeItem | null;
+        shipVoucher?: DiscountCodeItem | null;
+        buyNowItemId?: string;
+      }
+    | undefined;
   VoucherPicker: { subtotal: number; orderVoucherCode: string | null; shipVoucherCode: string | null };
   OrderSuccess: { orderId: string; total: number; method: PaymentMethod };
   Orders: undefined;
@@ -29,8 +37,13 @@ export type RootStackParamList = {
   Register: undefined;
   ForgotPassword: undefined;
   AddressBook: undefined;
-  // Không có addressId = thêm mới địa chỉ.
-  AddressForm: { addressId?: string };
+  // Không có addressId = thêm mới địa chỉ. `pickedAddress` là chuỗi địa chỉ màn
+  // Chọn trên bản đồ trả ngược về (cùng lối với VoucherPicker -> Checkout: trả kết
+  // quả qua tham số tuyến, không truyền hàm callback).
+  AddressForm: { addressId?: string; pickedAddress?: string };
+  // Toạ độ mở đầu: lấy từ gợi ý người dùng vừa chọn, không có thì màn tự lấy mặc định.
+  // `addressId` chỉ đi nhờ để trả lại đúng cho màn Thêm/Sửa địa chỉ lúc quay về.
+  LocationPicker: { addressId?: string; lat?: number; lon?: number };
   Profile: undefined;
   Preferences: undefined;
   Reviews: { productId: string };

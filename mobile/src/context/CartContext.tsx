@@ -32,7 +32,8 @@ interface CartContextValue {
   loading: boolean;
   error: string | null;
   reload: () => Promise<void>;
-  add: (product: Product, quantity: number) => Promise<void>;
+  // Trả về id dòng giỏ vừa thêm/cộng dồn, để "Mua ngay" đặt riêng đúng dòng đó.
+  add: (product: Product, quantity: number) => Promise<string>;
   updateQuantity: (itemId: string, quantity: number) => Promise<void>;
   remove: (itemId: string) => Promise<void>;
   // Các dòng đang được tick ở màn Giỏ hàng — đơn hàng chỉ gồm bấy nhiêu, và mọi con
@@ -82,8 +83,9 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
   const add = useCallback(
     async (product: Product, quantity: number) => {
-      await cartApi.addItem(product.id, quantity);
+      const item = await cartApi.addItem(product.id, quantity);
       await reload();
+      return item.id;
     },
     [reload],
   );
