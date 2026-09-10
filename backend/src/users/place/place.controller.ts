@@ -1,6 +1,6 @@
 import { Controller, Get, Query, UseGuards } from '@nestjs/common';
 import { PlaceService } from './place.service';
-import { AutocompletePlaceDto } from './place.dto';
+import { AutocompletePlaceDto, ReversePlaceDto } from './place.dto';
 import { JwtAccessGuard } from '../auth/auth.guard';
 
 @Controller('places')
@@ -12,5 +12,11 @@ export class PlaceController {
   @Get('autocomplete')
   autocomplete(@Query() query: AutocompletePlaceDto) {
     return this.placeService.autocomplete(query);
+  }
+
+  // GET /api/places/reverse?lat=...&lon=...
+  @Get('reverse')
+  reverse(@Query() query: ReversePlaceDto) {
+    return this.placeService.reverse(query);
   }
 }
