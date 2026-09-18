@@ -1,4 +1,6 @@
-import { BadGatewayException, Injectable } from '@nestjs/common';
+import { readFileSync } from 'fs';
+import { join } from 'path';
+import { BadGatewayException, Injectable, NotFoundException } from '@nestjs/common';
 import { AutocompletePlaceDto, ReversePlaceDto } from './place.dto';
 
 // Photon (komoot) — geocoder mã nguồn mở chạy trên dữ liệu OpenStreetMap.
@@ -101,8 +103,55 @@ function toPlaceItem(feature: PhotonFeature, index: number): PlaceItem {
   };
 }
 
+// Cây đơn vị hành chính 63 tỉnh → quận/huyện → phường/xã, bản rút gọn chỉ còn
+// code + name (nguồn provinces.open-api.vn/api/v1, tải ngày 2026-09-18). Đóng gói
+// tĩnh thay vì gọi API ngoài mỗi lượt: dữ liệu gần như không đổi và màn thêm địa chỉ
+// không được chết theo dịch vụ bên thứ ba. File được nest-cli copy vào dist qua mục
+// assets trong nest-cli.json.
+interface WardNode {
+  code: number;
+  name: string;
+}
+interface DistrictNode extends WardNode {
+  wards: WardNode[];
+}
+interface ProvinceNode extends WardNode {
+  districts: DistrictNode[];
+}
+
+let divisionsCache: ProvinceNode[] | null = null;
+function loadDivisions(): ProvinceNode[] {
+  divisionsCache ??= JSON.parse(
+    readFileSync(join(__dirname, 'vn-divisions.json'), 'utf8'),
+  ) as ProvinceNode[];
+  return divisionsCache;
+}
+
 @Injectable()
 export class PlaceService {
+  // GET /api/places/provinces
+  provinces() {
+    return { items: loadDivisions().map(({ code, name }) => ({ code, name })) };
+  }
+
+  // GET /api/places/districts?province_code=...
+  districts(provinceCode: number) {
+    const province = loadDivisions().find((p) => p.code === provinceCode);
+    if (!province) throw new NotFoundException('Không tìm thấy tỉnh/thành phố');
+    return { items: province.districts.map(({ code, name }) => ({ code, name })) };
+  }
+
+  // GET /api/places/wards?district_code=...
+  wards(districtCode: number) {
+    for (const province of loadDivisions()) {
+      const district = province.districts.find((d) => d.code === districtCode);
+      if (district) {
+        return { items: district.wards.map(({ code, name }) => ({ code, name })) };
+      }
+    }
+    throw new NotFoundException('Không tìm thấy quận/huyện');
+  }
+
   private async fetchPhoton(url: string): Promise<PhotonFeature[]> {
     let res: Response;
     try {

@@ -4,6 +4,16 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ScheduleModule } from '@nestjs/schedule';
 import cookieParser from 'cookie-parser';
+import { defaults as pgDefaults, types as pgTypes } from 'pg';
+
+// CSDL Neon dùng chung với backend Web (deploy ở múi giờ UTC): các cột `timestamp`
+// không kèm múi giờ đang lưu giờ UTC. node-pg mặc định đọc/ghi theo giờ của máy chạy
+// backend — chạy trên máy ở VN là mọi mốc giờ (thông báo, đơn hàng…) lệch -7 tiếng.
+// Ép cả hai chiều về UTC để khớp quy ước sẵn có trong DB.
+pgTypes.setTypeParser(pgTypes.builtins.TIMESTAMP, (value: string) =>
+  new Date(value.replace(' ', 'T') + 'Z'),
+);
+pgDefaults.parseInputDatesAsUTC = true;
 import configuration from './config/configuration';
 import { RedisModule } from './config/redis';
 import { AuthModule } from './users/auth/auth.module';
