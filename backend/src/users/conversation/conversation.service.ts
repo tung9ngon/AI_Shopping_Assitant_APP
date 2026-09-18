@@ -7,7 +7,7 @@ import { CreateConversationDto, SendMessageDto, QueryMessagesDto } from './conve
 import { ChatService } from '../chat/chat.service';
 import { ChatMessageDto } from '../chat/chat.dto';
 
-// Số tin nhắn cũ gửi kèm cho Gemini làm ngữ cảnh. Cắt bớt để phiên dài không làm
+// Số tin nhắn cũ gửi kèm cho model AI làm ngữ cảnh. Cắt bớt để phiên dài không làm
 // phình payload và chi phí mỗi lượt.
 const HISTORY_LIMIT = 20;
 
@@ -125,7 +125,7 @@ export class ConversationService {
     try {
       reply = await this.generateAssistantReply(conversation, dto.content, history);
     } catch (err) {
-      // Gemini hỏng (thiếu API key, quá tải...) thì bỏ luôn tin nhắn vừa lưu: để lại
+      // AI hỏng (thiếu API key, quá tải...) thì bỏ luôn tin nhắn vừa lưu: để lại
       // câu hỏi không có câu trả lời sẽ thành một lỗ hổng trong lịch sử, và lượt sau
       // vẫn gửi câu đó lên như ngữ cảnh.
       await this.messageRepo.delete({ id: userMessage.id });
@@ -204,7 +204,7 @@ export class ConversationService {
     return { claimed: result.affected ?? 0 };
   }
 
-  // Lịch sử cho Gemini: chỉ text, đúng vai 'user' | 'model'. Lấy HISTORY_LIMIT tin gần
+  // Lịch sử cho AI: chỉ text, đúng vai 'user' | 'model'. Lấy HISTORY_LIMIT tin gần
   // nhất (query DESC rồi đảo lại) để phiên dài vẫn còn đúng thứ tự thời gian.
   private async buildHistory(conversationId: string): Promise<ChatMessageDto[]> {
     const recent = await this.messageRepo.find({
@@ -219,7 +219,7 @@ export class ConversationService {
   }
 
   // ---------- Sinh câu trả lời của agent ----------
-  // Dùng chung ChatService với POST /api/chat: cùng một Gemini, cùng công cụ
+  // Dùng chung ChatService với POST /api/chat: cùng một model AI (FPT), cùng công cụ
   // search_products. Khác ở chỗ nhóm này LƯU lại hội thoại, còn /api/chat thì không.
   // AI chỉ tư vấn & gợi ý, KHÔNG tự thêm giỏ hàng / thanh toán thay người dùng.
   private async generateAssistantReply(
@@ -241,7 +241,7 @@ export class ConversationService {
 
     return {
       content: reply,
-      // Lưu nguyên danh sách sản phẩm Gemini vừa tra: mở lại phiên cũ vẫn thấy đúng
+      // Lưu nguyên danh sách sản phẩm AI vừa tra: mở lại phiên cũ vẫn thấy đúng
       // các sản phẩm đã gợi ý, không phải tra lại (giá có thể đã đổi từ lúc đó).
       message_type: hasProducts ? 'product_card' : 'text',
       metadata: hasProducts ? { products } : null,

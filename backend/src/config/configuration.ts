@@ -50,8 +50,8 @@ export default () => ({
   checksumKey: process.env.PAYOS_CHECKSUM_KEY,
   },
 
-  gemini: {
-    apiKey: process.env.GEMINI_API_KEY,
-    model: process.env.GEMINI_MODEL, // vd: gemini-1.5-flash, gemini-2.0-flash
+  fpt: {
+    apiKey: process.env.FPT_KEY,
+    model: process.env.FPT_MODEL, // vd: DeepSeek-V4-Flash, Llama-3.3-70B-Instruct
   },
 });
