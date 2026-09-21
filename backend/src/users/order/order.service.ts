@@ -12,6 +12,7 @@ import { CartItem } from '../../database/cart-item.entity';
 import { DiscountCode, DiscountType } from '../../database/discount-code.entity';
 import { ProductImage } from '../../database/product-image.entity';
 import { Address } from '../../database/address.entity';
+import { Notification } from '../../database/notification.entity';
 import { CreateOrderDto, QueryOrderDto } from './order.dto';
 
 const SHIPPING_FEE = 30_000;
@@ -238,6 +239,21 @@ export class OrderService {
       // Chỉ xoá đúng những dòng đã lên đơn — dòng không tick vẫn phải nằm lại trong giỏ.
       await cartItemRepo.delete({ id: In(cartItems.map((item) => item.id)) });
 
+      // Ghi thông báo trong CÙNG giao dịch: đơn tạo được thì chắc chắn có thông báo,
+      // rollback thì không để lại thông báo mồ côi. Màn Notifications của app đọc
+      // type 'order_update' + data.order_id để mở thẳng chi tiết đơn.
+      const notificationRepo = manager.getRepository(Notification);
+      await notificationRepo.save(
+        notificationRepo.create({
+          user_id: userId,
+          type: 'order_update',
+          title: 'Đặt hàng thành công',
+          body: `Đơn hàng #${savedOrder.id.slice(0, 8).toUpperCase()} (${total.toLocaleString('vi-VN')}đ) đã được tạo và đang chờ xử lý.`,
+          data: { order_id: savedOrder.id },
+          channel: 'app',
+        }),
+      );
+
       return {
         id: savedOrder.id,
         subtotal: savedOrder.subtotal,
@@ -270,28 +286,46 @@ export class OrderService {
       take: limit,
     });
 
+    // Thẻ đơn trên app hiện "Đơn hàng: <tên sản phẩm đầu>" kèm ảnh như bản web, nên
+    // kéo hẳn dòng hàng + sản phẩm về thay vì chỉ đếm số dòng như trước.
     const orderIds = items.map((o) => o.id);
-    const counts = orderIds.length
-      ? await this.orderItemRepo
-          .createQueryBuilder('item')
-          .select('item.order_id', 'order_id')
-          .addSelect('COUNT(*)', 'item_count')
-          .where('item.order_id IN (:...orderIds)', { orderIds })
-          .groupBy('item.order_id')
-          .getRawMany()
+    const orderItems = orderIds.length
+      ? await this.orderItemRepo.find({
+          where: { order_id: In(orderIds) },
+          relations: { product: true },
+        })
       : [];
-    const countMap = new Map(
-      counts.map((c) => [c.order_id, Number(c.item_count)]),
+    const itemsByOrder = new Map<string, OrderItem[]>();
+    for (const item of orderItems) {
+      const list = itemsByOrder.get(item.order_id) ?? [];
+      list.push(item);
+      itemsByOrder.set(item.order_id, list);
+    }
+
+    const productIds = [...new Set(orderItems.map((i) => i.product_id))];
+    const primaryImages = productIds.length
+      ? await this.imageRepo.find({
+          where: { product_id: In(productIds), is_primary: true },
+        })
+      : [];
+    const imageMap = new Map(
+      primaryImages.map((img) => [img.product_id, img.image_url]),
     );
 
     return {
-      items: items.map((o) => ({
-        id: o.id,
-        total: o.total,
-        status: o.status,
-        created_at: o.created_at,
-        item_count: countMap.get(o.id) ?? 0,
-      })),
+      items: items.map((o) => {
+        const lines = itemsByOrder.get(o.id) ?? [];
+        const first = lines[0];
+        return {
+          id: o.id,
+          total: o.total,
+          status: o.status,
+          created_at: o.created_at,
+          item_count: lines.length,
+          product_name: first?.product?.name ?? null,
+          product_image: first ? (imageMap.get(first.product_id) ?? null) : null,
+        };
+      }),
       total,
       page,
       limit,

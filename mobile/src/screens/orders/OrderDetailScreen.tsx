@@ -54,6 +54,8 @@ export default function OrderDetailScreen() {
   const status = order.status;
   const reachedIndex = TIMELINE.findIndex((t) => t.status === status);
   const address = order.shipping_address;
+  // Mã đơn là UUID, dài quá một dòng — cắt lấy đoạn đầu như mã tra cứu.
+  const displayCode = `#${order.id.slice(0, 8).toUpperCase()}`;
 
   const cancel = async () => {
     setCancelling(true);
@@ -68,7 +70,7 @@ export default function OrderDetailScreen() {
   };
 
   const confirmCancel = () => {
-    Alert.alert('Huỷ đơn hàng', `Bạn chắc chắn muốn huỷ đơn #${order.id.slice(0, 8).toUpperCase()}?`, [
+    Alert.alert('Huỷ đơn hàng', `Bạn chắc chắn muốn huỷ đơn ${displayCode}?`, [
       { text: 'Không', style: 'cancel' },
       { text: 'Huỷ đơn', style: 'destructive', onPress: cancel },
     ]);
@@ -81,7 +83,7 @@ export default function OrderDetailScreen() {
         <Card style={styles.card}>
           <View style={styles.statusHead}>
             <View style={styles.flex}>
-              <Text style={styles.orderId}>#{order.id.slice(0, 8).toUpperCase()}</Text>
+              <Text style={styles.orderId}>{displayCode}</Text>
               <Text style={styles.date}>Đặt lúc {formatDate(order.created_at)}</Text>
             </View>
             <Tag label={ORDER_STATUS_LABEL[status]} color={ORDER_STATUS_COLOR[status]} />

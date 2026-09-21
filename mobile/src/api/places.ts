@@ -18,9 +18,25 @@ export interface PlaceSuggestion {
   lon: number | null;
 }
 
+// Đơn vị hành chính cho bộ chọn Tỉnh/TP → Quận/Huyện → Phường/Xã ở màn thêm địa chỉ.
+// Dữ liệu tĩnh 63 tỉnh đóng gói trong backend (vn-divisions.json), không đi qua Photon.
+export interface DivisionItem {
+  code: number;
+  name: string;
+}
+
 export const placeApi = {
   autocomplete: (input: string, signal?: AbortSignal) =>
     api.get<{ items: PlaceSuggestion[] }>('/places/autocomplete', { input }, { signal }),
+
+  provinces: (signal?: AbortSignal) =>
+    api.get<{ items: DivisionItem[] }>('/places/provinces', undefined, { signal }),
+
+  districts: (provinceCode: number, signal?: AbortSignal) =>
+    api.get<{ items: DivisionItem[] }>('/places/districts', { province_code: provinceCode }, { signal }),
+
+  wards: (districtCode: number, signal?: AbortSignal) =>
+    api.get<{ items: DivisionItem[] }>('/places/wards', { district_code: districtCode }, { signal }),
 
   // Thả ghim trên bản đồ -> chuỗi địa chỉ. `item` là null khi điểm đó không có gì
   // trong dữ liệu OpenStreetMap (giữa ruộng, giữa biển) — không phải lỗi.

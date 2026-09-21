@@ -71,10 +71,18 @@ export default function AccountScreen() {
       onPress: () => navigation.navigate('Orders'),
     },
     {
-      icon: 'notifications-outline',
+      icon: 'pricetag-outline',
       label: 'Theo dõi giá',
       hint: 'Báo khi sản phẩm giảm tới mức bạn đặt',
       onPress: () => navigation.navigate('PriceAlerts'),
+    },
+    // Chuông ở Trang chủ là lối vào duy nhất trước đây — người dùng ở tab Tài khoản
+    // không có đường nào tới trung tâm thông báo.
+    {
+      icon: 'notifications-outline',
+      label: 'Thông báo',
+      hint: 'Cập nhật đơn hàng, biến động giá',
+      onPress: () => navigation.navigate('Notifications'),
     },
   ];
 

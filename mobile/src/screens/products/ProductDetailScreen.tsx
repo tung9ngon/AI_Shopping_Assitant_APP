@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState } from 'react';
 import {
   Alert,
+  FlatList,
   Modal,
   Pressable,
   ScrollView,
@@ -9,33 +10,52 @@ import {
   Text,
   useWindowDimensions,
   View,
+  type NativeScrollEvent,
+  type NativeSyntheticEvent,
 } from 'react-native';
-import Ionicons from '@react-native-vector-icons/ionicons/static';
+import Ionicons, { type IoniconsIconName } from '@react-native-vector-icons/ionicons/static';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
 import Screen from '../../components/Screen';
 import AppButton, { BUTTON_HEIGHT } from '../../components/AppButton';
+import ProductCard from '../../components/ProductCard';
 import ProductThumb from '../../components/ProductThumb';
 import QuantityStepper from '../../components/QuantityStepper';
 import Rating from '../../components/Rating';
+import SectionHeader from '../../components/SectionHeader';
 import StarRating from '../../components/StarRating';
 import TextField from '../../components/TextField';
 import Card from '../../components/Card';
 import Gradient from '../../components/Gradient';
 import LoadState from '../../components/LoadState';
 import { useApi } from '../../hooks/useApi';
+import { useQuickAdd } from '../../hooks/useQuickAdd';
 import { productApi } from '../../api/products';
 import { priceAlertApi } from '../../api/priceAlerts';
 import { getErrorMessage } from '../../api/client';
 import { useCart } from '../../context/CartContext';
 import { colors, gradient, radius, shadow, spacing } from '../../theme';
 import { formatVND } from '../../utils/format';
-import { getItems, primaryImageOf } from '../../types';
+import { FREE_SHIPPING_THRESHOLD } from '../../constants';
+import { getItems } from '../../types';
+import type { ProductImage } from '../../types';
 import type { RootStackParamList } from '../../navigation/types';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
+
+// Băng "Có thể bạn cũng thích": lấy dư một để lọc bỏ chính sản phẩm đang xem.
+const SIMILAR_LIMIT = 6;
+
+// Cam kết hiện trên trang: chỉ ghi những gì app thật sự có — ngưỡng miễn ship lấy
+// từ constants (khớp backend), hai hình thức thanh toán là hai lựa chọn ở màn Đặt
+// hàng. Không bịa chính sách đổi trả/bảo hành vì backend không có.
+const TRUST_ITEMS: { icon: IoniconsIconName; text: string }[] = [
+  { icon: 'car-outline', text: `Freeship đơn từ ${formatVND(FREE_SHIPPING_THRESHOLD)}` },
+  { icon: 'cash-outline', text: 'Thanh toán khi nhận hàng' },
+  { icon: 'qr-code-outline', text: 'Quét QR PayOS trên máy' },
+];
 
 export default function ProductDetailScreen() {
   const navigation = useNavigation<Nav>();
@@ -43,6 +63,7 @@ export default function ProductDetailScreen() {
   const { width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const { add } = useCart();
+  const quickAdd = useQuickAdd();
 
   // GET /products/:id trả kèm cả category, images, specs, tags — không cần gọi
   // /products/:id/specs riêng.
@@ -56,6 +77,19 @@ export default function ProductDetailScreen() {
   const reviews = useApi(() => productApi.reviews(productId, { limit: 2 }), [productId]);
   const reviewItems = reviews.data ? getItems(reviews.data) : [];
 
+  // Sản phẩm cùng danh mục — chỉ gọi khi đã biết danh mục (sau khi chi tiết về).
+  const categoryId = product?.category_id ?? null;
+  const similar = useApi(
+    (signal) =>
+      categoryId
+        ? productApi.list({ categoryId, limit: SIMILAR_LIMIT + 1 }, signal)
+        : Promise.resolve(null),
+    [categoryId],
+  );
+  const similarItems = similar.data
+    ? getItems(similar.data).filter((p) => p.id !== productId).slice(0, SIMILAR_LIMIT)
+    : [];
+
   const [quantity, setQuantity] = useState(1);
   const [alertOpen, setAlertOpen] = useState(false);
   const [targetPrice, setTargetPrice] = useState('');
@@ -65,6 +99,8 @@ export default function ProductDetailScreen() {
   // Cờ riêng cho "Mua ngay" để spinner hiện đúng nút được bấm; cả hai nút cùng
   // khoá theo `adding` — bấm chồng khi request đang bay là số lượng bị cộng dồn.
   const [buying, setBuying] = useState(false);
+  // Trang ảnh đang xem trong gallery (0-based) — cho dãy chấm bên dưới.
+  const [page, setPage] = useState(0);
 
   // Nhãn "Đã thêm" tự tắt sau 1.8s — giữ timer để clear khi bấm dồn dập hoặc rời màn
   // trước khi hết giờ (setState trên component đã unmount).
@@ -102,7 +138,18 @@ export default function ProductDetailScreen() {
       setSavingAlert(false);
     }
   };
-  const primaryImage = primaryImageOf(product.images);
+
+  // Gallery: mọi ảnh của sản phẩm theo sort_order, ảnh chính lên đầu. Không có ảnh
+  // nào thì một trang giữ chỗ vẽ theo biểu tượng danh mục.
+  const images: (ProductImage | null)[] = product.images?.length
+    ? [...product.images].sort(
+        (a, b) => Number(b.is_primary) - Number(a.is_primary) || a.sort_order - b.sort_order,
+      )
+    : [null];
+
+  const onGalleryScrollEnd = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    setPage(Math.round(e.nativeEvent.contentOffset.x / width));
+  };
 
   // Giỏ hàng nằm trên máy chủ nên thêm vào giỏ là một lời gọi API có thể hỏng
   // (chưa đăng nhập -> 401). Báo lỗi thay vì im lặng.
@@ -146,9 +193,30 @@ export default function ProductDetailScreen() {
         contentContainerStyle={{ paddingBottom: ACTION_BAR_HEIGHT + insets.bottom }}
       >
         {/* Ảnh đặt trên nền cam rất nhạt thay vì nền trắng: ảnh sản phẩm phần lớn
-            nền trắng, để trên nền trắng thì trông như trôi lơ lửng. */}
+            nền trắng, để trên nền trắng thì trông như trôi lơ lửng. Nhiều ảnh thì
+            vuốt ngang từng trang, dãy chấm bên dưới báo đang ở ảnh nào. */}
         <Gradient colors={gradient.brandSoft} style={styles.gallery}>
-          <ProductThumb uri={primaryImage} icon={product.category?.icon} size={width * 0.66} />
+          <FlatList
+            horizontal
+            pagingEnabled
+            bounces={false}
+            showsHorizontalScrollIndicator={false}
+            data={images}
+            keyExtractor={(img, i) => img?.id ?? `placeholder-${i}`}
+            onMomentumScrollEnd={onGalleryScrollEnd}
+            renderItem={({ item }) => (
+              <View style={[styles.galleryPage, { width }]}>
+                <ProductThumb uri={item?.image_url} icon={product.category?.icon} size={width * 0.66} />
+              </View>
+            )}
+          />
+          {images.length > 1 ? (
+            <View style={styles.dots} pointerEvents="none">
+              {images.map((img, i) => (
+                <View key={img?.id ?? i} style={[styles.dot, i === page && styles.dotActive]} />
+              ))}
+            </View>
+          ) : null}
         </Gradient>
 
         {/* Khối thông tin bo góc trên và kéo lên đè lên mép dưới phần ảnh. */}
@@ -174,6 +242,18 @@ export default function ProductDetailScreen() {
               ))}
             </View>
           ) : null}
+
+          {/* ---- Cam kết mua hàng: ba điều app thật sự làm được ---- */}
+          <View style={styles.trustRow}>
+            {TRUST_ITEMS.map((item, i) => (
+              <View key={item.icon} style={[styles.trustItem, i > 0 && styles.trustItemBorder]}>
+                <Ionicons name={item.icon} size={18} color={colors.primary} />
+                <Text style={styles.trustText} numberOfLines={2}>
+                  {item.text}
+                </Text>
+              </View>
+            ))}
+          </View>
 
           <View style={styles.qtyRow}>
             <Text style={styles.qtyLabel}>Số lượng</Text>
@@ -246,18 +326,53 @@ export default function ProductDetailScreen() {
             <Ionicons name="chevron-forward" size={16} color={colors.primary} />
           </Pressable>
         </Card>
+
+        {/* ---- Cùng danh mục: giữ người xem ở lại thay vì quay ra rồi tìm lại ----
+            Mở bằng push để nút quay lại vẫn về đúng sản phẩm đang xem. */}
+        {similarItems.length > 0 ? (
+          <View style={styles.similar}>
+            <SectionHeader
+              title="Có thể bạn cũng thích"
+              subtitle={product.category?.name ? `Cùng danh mục ${product.category.name}` : undefined}
+            />
+            <FlatList
+              horizontal
+              data={similarItems}
+              keyExtractor={(p) => p.id}
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.similarList}
+              renderItem={({ item }) => (
+                <ProductCard
+                  product={item}
+                  width={150}
+                  onPress={() => navigation.push('ProductDetail', { productId: item.id })}
+                  onAdd={quickAdd}
+                />
+              )}
+            />
+          </View>
+        ) : null}
       </ScrollView>
 
-      {/* ---- Thanh hành động cố định dưới màn hình ---- */}
+      {/* ---- Thanh hành động cố định dưới màn hình ----
+          Tạm tính theo số lượng đặt ngay cạnh nút mua: người mua thấy con số trước
+          khi bấm, không phải nhẩm giá × số lượng. */}
       <View style={[styles.actionBar, { paddingBottom: spacing.md + insets.bottom }]}>
+        <View style={styles.actionPrice}>
+          <Text style={styles.actionLabel}>
+            {quantity > 1 ? `Tạm tính · ${quantity} sản phẩm` : 'Tạm tính'}
+          </Text>
+          <Text style={styles.actionTotal} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
+            {formatVND(price * quantity)}
+          </Text>
+        </View>
         <AppButton
-          title={added ? 'Đã thêm' : 'Thêm vào giỏ'}
+          title={added ? 'Đã thêm' : 'Thêm'}
           icon={added ? 'checkmark' : 'cart-outline'}
           variant="outline"
           loading={adding && !buying}
           disabled={adding}
           onPress={handleAdd}
-          style={styles.flexBtn}
         />
         <AppButton title="Mua ngay" loading={buying} disabled={adding} onPress={handleBuyNow} style={styles.flexBtn} />
       </View>
@@ -301,10 +416,23 @@ const ACTION_BAR_HEIGHT = BUTTON_HEIGHT + spacing.md * 2;
 
 const styles = StyleSheet.create({
   gallery: {
-    alignItems: 'center',
     paddingTop: spacing.lg,
     paddingBottom: spacing.xxl,
   },
+  galleryPage: { alignItems: 'center' },
+  // Dãy chấm nằm trên phần ảnh, cao hơn mép khối thông tin đè lên (marginTop -16).
+  dots: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: spacing.xl + spacing.xs,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 6,
+  },
+  dot: { width: 6, height: 6, borderRadius: 3, backgroundColor: 'rgba(242,109,33,0.28)' },
+  dotActive: { width: 18, backgroundColor: colors.primary },
+
   block: {
     backgroundColor: colors.surface,
     marginTop: -spacing.lg,
@@ -333,6 +461,18 @@ const styles = StyleSheet.create({
     backgroundColor: colors.bg,
   },
   tagText: { fontSize: 12, color: colors.textSecondary, fontWeight: '600' },
+
+  trustRow: {
+    flexDirection: 'row',
+    marginTop: spacing.md,
+    paddingVertical: spacing.md,
+    borderRadius: radius.lg,
+    backgroundColor: colors.bg,
+  },
+  trustItem: { flex: 1, alignItems: 'center', gap: spacing.xs, paddingHorizontal: spacing.sm },
+  trustItemBorder: { borderLeftWidth: 1, borderLeftColor: colors.border },
+  trustText: { fontSize: 11, color: colors.textSecondary, textAlign: 'center', lineHeight: 15 },
+
   qtyRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -379,6 +519,9 @@ const styles = StyleSheet.create({
   reviewMorePressed: { opacity: 0.6 },
   reviewMoreText: { fontSize: 13.5, fontWeight: '600', color: colors.primary },
 
+  similar: { marginTop: spacing.xl },
+  similarList: { paddingHorizontal: spacing.lg, gap: spacing.md, paddingBottom: spacing.sm },
+
   actionBar: {
     position: 'absolute',
     left: 0,
@@ -393,6 +536,9 @@ const styles = StyleSheet.create({
     borderTopRightRadius: radius.xl,
     ...shadow.raised,
   },
+  actionPrice: { flexShrink: 1, minWidth: 92, paddingLeft: spacing.xs },
+  actionLabel: { fontSize: 11, color: colors.textMuted },
+  actionTotal: { fontSize: 18, fontWeight: '800', color: colors.primary, letterSpacing: -0.4 },
   flexBtn: { flex: 1 },
 
   backdrop: {

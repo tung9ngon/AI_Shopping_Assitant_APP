@@ -2,10 +2,14 @@
 import type { NavigatorScreenParams } from '@react-navigation/native';
 import type { PaymentMethod } from '../types';
 import type { DiscountCodeItem } from '../api/discounts';
+import type { ProductQuery } from '../api/products';
 
 export type TabParamList = {
   Home: undefined;
-  Products: { categoryId?: string; keyword?: string; brand?: string } | undefined;
+  // `sort`: băng "Đánh giá cao nhất" ở trang chủ mở danh sách đã xếp theo điểm.
+  Products:
+    | { categoryId?: string; keyword?: string; brand?: string; sort?: NonNullable<ProductQuery['sort']> }
+    | undefined;
   Chat: undefined;
   Cart: undefined;
   Account: undefined;
