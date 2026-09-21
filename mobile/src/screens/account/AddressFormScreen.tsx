@@ -10,16 +10,19 @@
 // Ràng buộc lấy đúng theo backend (users/address/address.dto.ts) để app không chặn
 // dữ liệu BE chấp nhận và ngược lại: địa chỉ tối đa 255 ký tự, tên người nhận tối đa
 // 150, số điện thoại khớp /^[0-9+ ]{8,15}$/.
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  FlatList,
   KeyboardAvoidingView,
+  Modal,
   Platform,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from 'react-native';
 import Ionicons from '@react-native-vector-icons/ionicons/static';
@@ -30,7 +33,7 @@ import Screen from '../../components/Screen';
 import AppButton from '../../components/AppButton';
 import TextField from '../../components/TextField';
 import { useAccount } from '../../context/AccountContext';
-import { placeApi, type PlaceSuggestion } from '../../api/places';
+import { placeApi, type DivisionItem, type PlaceSuggestion } from '../../api/places';
 import { getErrorMessage } from '../../api/client';
 import { colors, radius, spacing } from '../../theme';
 import { PHONE_MESSAGE, PHONE_PATTERN } from '../../constants';
@@ -114,6 +117,29 @@ export default function AddressFormScreen() {
   // điểm mặc định, người dùng chỉ phải kéo một quãng ngắn để chỉnh cho chính xác.
   const [pickedCoords, setPickedCoords] = useState<{ lat: number; lon: number } | null>(null);
 
+  // ---- Chọn Tỉnh/TP → Quận/Huyện → Phường/Xã ----
+  // Chuỗi khu vực vừa áp vào ô địa chỉ — nhớ lại để lần chọn sau THAY đúng phần đó
+  // thay vì nối chồng, còn phần số nhà/tên đường người dùng đã gõ thì giữ nguyên.
+  const [divisionOpen, setDivisionOpen] = useState(false);
+  const [regionLabel, setRegionLabel] = useState<string | null>(null);
+
+  const applyRegion = (region: string) => {
+    skipSuggest.current = true;
+    setSuggestions([]);
+    setSuggestNote(null);
+    setErrors((prev) => ({ ...prev, address: undefined }));
+    setFullAddress((prev) => {
+      const trimmed = prev.trim().replace(/[,\s]+$/, '');
+      const street =
+        regionLabel && trimmed.endsWith(regionLabel)
+          ? trimmed.slice(0, trimmed.length - regionLabel.length).replace(/[,\s]+$/, '')
+          : trimmed;
+      return ((street ? `${street}, ` : '') + region).slice(0, MAX_ADDRESS);
+    });
+    setRegionLabel(region);
+    setDivisionOpen(false);
+  };
+
   const pickSuggestion = (item: PlaceSuggestion) => {
     skipSuggest.current = true;
     setFullAddress(item.description.slice(0, MAX_ADDRESS));
@@ -196,12 +222,29 @@ export default function AddressFormScreen() {
             error={errors.phone}
           />
 
+          {/* Chọn khu vực theo cấp hành chính, điền thẳng vào ô địa chỉ bên dưới —
+              người dùng chỉ còn phải gõ thêm số nhà/tên đường. */}
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => setDivisionOpen(true)}
+            style={({ pressed }) => [styles.divisionRow, pressed && styles.divisionRowPressed]}
+          >
+            <Ionicons name="business-outline" size={18} color={colors.primary} />
+            <Text
+              style={[styles.divisionText, !regionLabel && styles.divisionPlaceholder]}
+              numberOfLines={1}
+            >
+              {regionLabel ?? 'Chọn Tỉnh/TP, Quận/Huyện, Phường/Xã'}
+            </Text>
+            <Ionicons name="chevron-down" size={16} color={colors.textMuted} />
+          </Pressable>
+
           <TextField
             label="Địa chỉ"
             icon="location-outline"
             value={fullAddress}
             onChangeText={setFullAddress}
-            placeholder="Gõ để tìm địa chỉ trên bản đồ"
+            placeholder="Số nhà, tên đường… hoặc gõ để tìm trên bản đồ"
             multiline
             maxLength={MAX_ADDRESS}
             style={styles.addressInput}
@@ -300,7 +343,193 @@ export default function AddressFormScreen() {
           />
         </ScrollView>
       </KeyboardAvoidingView>
+
+      <DivisionPickerModal
+        visible={divisionOpen}
+        onClose={() => setDivisionOpen(false)}
+        onDone={applyRegion}
+      />
     </Screen>
+  );
+}
+
+// So khớp không phân biệt dấu: gõ "ha noi" vẫn ra "Hà Nội".
+function stripAccents(s: string): string {
+  return s
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/đ/g, 'd')
+    .replace(/Đ/g, 'D')
+    .toLowerCase();
+}
+
+// Bộ chọn 3 cấp trong một tấm sheet: chọn tỉnh xong danh sách đổi sang quận/huyện
+// của tỉnh đó, rồi phường/xã; chip phía trên cho quay lại cấp đã chọn. Chọn tới
+// phường là xong — trả về chuỗi "Phường X, Quận Y, Thành phố Z".
+function DivisionPickerModal({
+  visible,
+  onClose,
+  onDone,
+}: {
+  visible: boolean;
+  onClose: () => void;
+  onDone: (region: string) => void;
+}) {
+  const [province, setProvince] = useState<DivisionItem | null>(null);
+  const [district, setDistrict] = useState<DivisionItem | null>(null);
+  const [items, setItems] = useState<DivisionItem[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [filter, setFilter] = useState('');
+  // Đổi giá trị để chạy lại lượt tải hiện tại sau khi lỗi mạng.
+  const [retryTick, setRetryTick] = useState(0);
+
+  const level = !province ? 'province' : !district ? 'district' : 'ward';
+
+  useEffect(() => {
+    if (!visible) return;
+    const controller = new AbortController();
+    (async () => {
+      setLoading(true);
+      setError(null);
+      setItems([]);
+      try {
+        const res = !province
+          ? await placeApi.provinces(controller.signal)
+          : !district
+            ? await placeApi.districts(province.code, controller.signal)
+            : await placeApi.wards(district.code, controller.signal);
+        setItems(res.items);
+      } catch (err) {
+        if (controller.signal.aborted) return;
+        setError(getErrorMessage(err));
+      } finally {
+        if (!controller.signal.aborted) setLoading(false);
+      }
+    })();
+    return () => controller.abort();
+  }, [visible, province, district, retryTick]);
+
+  // Sang cấp khác (hoặc mở lại) thì ô lọc phải sạch, không lọc tiếp bằng từ khoá cũ.
+  useEffect(() => {
+    setFilter('');
+  }, [level, visible]);
+
+  const filtered = useMemo(() => {
+    const term = stripAccents(filter.trim());
+    return term ? items.filter((it) => stripAccents(it.name).includes(term)) : items;
+  }, [items, filter]);
+
+  const pick = (item: DivisionItem) => {
+    if (!province) {
+      setProvince(item);
+    } else if (!district) {
+      setDistrict(item);
+    } else {
+      onDone(`${item.name}, ${district.name}, ${province.name}`);
+      // Lần mở sau bắt đầu lại từ cấp tỉnh.
+      setProvince(null);
+      setDistrict(null);
+    }
+  };
+
+  const titles = {
+    province: 'Chọn Tỉnh / Thành phố',
+    district: 'Chọn Quận / Huyện',
+    ward: 'Chọn Phường / Xã',
+  } as const;
+
+  return (
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+      <Pressable style={styles.backdrop} onPress={onClose} />
+      <View style={styles.sheet}>
+        <View style={styles.sheetHandle} />
+        <Text style={styles.sheetTitle}>{titles[level]}</Text>
+
+        {province ? (
+          <View style={styles.crumbRow}>
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => {
+                setProvince(null);
+                setDistrict(null);
+              }}
+              style={styles.crumb}
+            >
+              <Text style={styles.crumbText} numberOfLines={1}>
+                {province.name}
+              </Text>
+              <Ionicons name="close-circle" size={15} color={colors.primary} />
+            </Pressable>
+            {district ? (
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => setDistrict(null)}
+                style={styles.crumb}
+              >
+                <Text style={styles.crumbText} numberOfLines={1}>
+                  {district.name}
+                </Text>
+                <Ionicons name="close-circle" size={15} color={colors.primary} />
+              </Pressable>
+            ) : null}
+          </View>
+        ) : null}
+
+        <View style={styles.filterBox}>
+          <Ionicons name="search" size={16} color={colors.textMuted} />
+          <TextInput
+            value={filter}
+            onChangeText={setFilter}
+            placeholder="Gõ để lọc nhanh…"
+            placeholderTextColor={colors.textMuted}
+            style={styles.filterInput}
+            accessibilityLabel="Lọc danh sách"
+          />
+        </View>
+
+        {loading ? (
+          <View style={styles.sheetStatus}>
+            <ActivityIndicator color={colors.primary} />
+          </View>
+        ) : error ? (
+          <View style={styles.sheetStatus}>
+            <Text style={styles.sheetError}>{error}</Text>
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => setRetryTick((t) => t + 1)}
+              style={styles.retryBtn}
+            >
+              <Text style={styles.retryText}>Thử lại</Text>
+            </Pressable>
+          </View>
+        ) : (
+          <FlatList
+            data={filtered}
+            keyExtractor={(it) => String(it.code)}
+            keyboardShouldPersistTaps="handled"
+            style={styles.divisionList}
+            ListEmptyComponent={
+              <Text style={styles.sheetEmpty}>Không có kết quả phù hợp.</Text>
+            }
+            renderItem={({ item }) => (
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => pick(item)}
+                style={({ pressed }) => [styles.divisionItem, pressed && styles.divisionItemPressed]}
+              >
+                <Text style={styles.divisionItemText}>{item.name}</Text>
+                <Ionicons
+                  name={level === 'ward' ? 'checkmark-circle-outline' : 'chevron-forward'}
+                  size={17}
+                  color={colors.textMuted}
+                />
+              </Pressable>
+            )}
+          />
+        )}
+      </View>
+    </Modal>
   );
 }
 
@@ -370,4 +599,86 @@ const styles = StyleSheet.create({
   checkHint: { fontSize: 12, color: colors.textMuted, lineHeight: 17, marginTop: 3 },
 
   submit: { marginTop: spacing.sm },
+
+  divisionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingHorizontal: spacing.md,
+    height: 48,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+  },
+  divisionRowPressed: { backgroundColor: colors.surfaceAlt },
+  divisionText: { flex: 1, fontSize: 14, color: colors.text },
+  divisionPlaceholder: { color: colors.textMuted },
+
+  backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.35)' },
+  sheet: {
+    maxHeight: '78%',
+    backgroundColor: colors.surface,
+    borderTopLeftRadius: radius.xl,
+    borderTopRightRadius: radius.xl,
+    padding: spacing.lg,
+    paddingBottom: spacing.xl,
+  },
+  sheetHandle: {
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: colors.borderStrong,
+    alignSelf: 'center',
+    marginBottom: spacing.lg,
+  },
+  sheetTitle: { fontSize: 17, fontWeight: '700', color: colors.text, marginBottom: spacing.md },
+  crumbRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginBottom: spacing.md },
+  crumb: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    maxWidth: '48%',
+    paddingHorizontal: spacing.md,
+    paddingVertical: 6,
+    borderRadius: radius.pill,
+    backgroundColor: colors.primarySoft,
+  },
+  crumbText: { flexShrink: 1, fontSize: 12.5, fontWeight: '600', color: colors.primary },
+  filterBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingHorizontal: spacing.md,
+    height: 40,
+    borderRadius: radius.lg,
+    backgroundColor: colors.surfaceAlt,
+    marginBottom: spacing.sm,
+  },
+  filterInput: { flex: 1, fontSize: 14, color: colors.text, paddingVertical: 0 },
+  sheetStatus: { paddingVertical: spacing.xxl, alignItems: 'center', gap: spacing.md },
+  sheetError: { fontSize: 13, color: colors.textSecondary, textAlign: 'center', lineHeight: 19 },
+  retryBtn: {
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    borderColor: colors.primary,
+  },
+  retryText: { fontSize: 13, fontWeight: '700', color: colors.primary },
+  // flexShrink để danh sách dài hơn sheet thì co lại trong khuôn maxHeight và cuộn,
+  // không tràn ra ngoài mép dưới.
+  divisionList: { flexGrow: 0, flexShrink: 1 },
+  divisionItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: spacing.md,
+    paddingVertical: spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  divisionItemPressed: { backgroundColor: colors.surfaceAlt },
+  divisionItemText: { flex: 1, fontSize: 14, color: colors.text },
+  sheetEmpty: { fontSize: 13, color: colors.textMuted, paddingVertical: spacing.xl, textAlign: 'center' },
 });

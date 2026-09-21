@@ -27,6 +27,7 @@ import Chip from '../../components/Chip';
 import LoadState from '../../components/LoadState';
 import { ProductGridSkeleton } from '../../components/Skeleton';
 import { useApi } from '../../hooks/useApi';
+import { useQuickAdd } from '../../hooks/useQuickAdd';
 import { categoryApi } from '../../api/categories';
 import { productApi, type ProductListItem } from '../../api/products';
 import { colors, radius, shadow, spacing, useTabBarHeight } from '../../theme';
@@ -82,6 +83,8 @@ export default function ProductsScreen() {
     // Chip thương hiệu ở Trang chủ đi qua param `brand` — search của BE chỉ khớp
     // tên sản phẩm, không khớp hãng.
     if (route.params?.brand !== undefined) setBrand(route.params.brand ?? null);
+    // "Xem tất cả" ở băng Đánh giá cao nhất mở thẳng danh sách xếp theo điểm.
+    if (route.params?.sort !== undefined) setSort(route.params.sort ?? 'newest');
   }, [route.params]);
 
   const cardWidth = (width - spacing.lg * 2 - spacing.md) / 2;
@@ -157,6 +160,8 @@ export default function ProductsScreen() {
 
   const activeFilters = (brand ? 1 : 0) + (band != null ? 1 : 0) + (sort !== 'newest' ? 1 : 0);
 
+  const quickAdd = useQuickAdd();
+
   // renderItem ổn định + ProductCard bọc memo: gõ từng ký tự vào ô tìm kiếm chỉ
   // re-render phần header, không vẽ lại cả lưới 50 thẻ ảnh theo từng phím.
   const renderItem = useCallback(
@@ -165,9 +170,10 @@ export default function ProductsScreen() {
         product={item}
         width={cardWidth}
         onPress={() => navigation.navigate('ProductDetail', { productId: item.id })}
+        onAdd={quickAdd}
       />
     ),
-    [cardWidth, navigation],
+    [cardWidth, navigation, quickAdd],
   );
 
   const resetFilters = () => {

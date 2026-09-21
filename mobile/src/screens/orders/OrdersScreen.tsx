@@ -1,8 +1,8 @@
 // UC-ORDER-03 — Xem danh sách đơn hàng của tôi (GET /api/orders).
 //
-// Danh sách của backend chỉ trả id, tổng tiền, trạng thái, ngày đặt và SỐ DÒNG HÀNG —
-// không kèm tên hay ảnh sản phẩm, nên thẻ đơn không hiện được sản phẩm nào. Muốn xem
-// hàng trong đơn phải mở chi tiết.
+// Thẻ đơn hiện "Đơn hàng: <tên sản phẩm đầu tiên>" kèm ảnh, cùng bố cục với bản web —
+// backend trả tên + ảnh của đúng một sản phẩm đại diện, muốn xem đủ hàng trong đơn
+// vẫn phải mở chi tiết.
 import { useState } from 'react';
 import { FlatList, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import Ionicons from '@react-native-vector-icons/ionicons/static';
@@ -12,6 +12,7 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import Screen from '../../components/Screen';
 import EmptyState from '../../components/EmptyState';
 import LoadState from '../../components/LoadState';
+import ProductThumb from '../../components/ProductThumb';
 import Tag from '../../components/Tag';
 import Chip from '../../components/Chip';
 import { orderApi } from '../../api/orders';
@@ -82,12 +83,18 @@ export default function OrdersScreen() {
               style={styles.card}
             >
               <View style={styles.cardHead}>
-                {/* Mã đơn là UUID, dài quá một dòng — cắt lấy đoạn đầu như mã tra cứu. */}
-                <Text style={styles.orderId}>#{item.id.slice(0, 8).toUpperCase()}</Text>
+                <ProductThumb uri={item.product_image} size={48} />
+                <View style={styles.headBody}>
+                  <Text style={styles.title} numberOfLines={2}>
+                    Đơn hàng: {item.product_name ?? `#${item.id.slice(0, 8).toUpperCase()}`}
+                  </Text>
+                  {/* Mã tra cứu vẫn là UUID cắt đoạn đầu, ghép cùng ngày như bản web. */}
+                  <Text style={styles.date}>
+                    #{item.id.slice(0, 8).toUpperCase()} · {formatDate(item.created_at)}
+                  </Text>
+                </View>
                 <Tag label={ORDER_STATUS_LABEL[item.status]} color={ORDER_STATUS_COLOR[item.status]} />
               </View>
-
-              <Text style={styles.date}>{formatDate(item.created_at)}</Text>
 
               <View style={styles.cardFoot}>
                 <Text style={styles.totalLabel}>{item.item_count} sản phẩm</Text>
@@ -119,8 +126,10 @@ const styles = StyleSheet.create({
 
   list: { padding: spacing.lg, gap: spacing.md },
   card: { backgroundColor: colors.surface, borderRadius: radius.xl, padding: spacing.lg, ...shadow.card },
-  cardHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing.md },
-  orderId: { fontSize: 12.5, fontWeight: '700', color: colors.textSecondary, letterSpacing: 0.2 },
+  cardHead: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginBottom: spacing.md },
+  // flex: 1 để tên sản phẩm dài xuống dòng thay vì đẩy tag trạng thái ra ngoài thẻ.
+  headBody: { flex: 1, gap: 2 },
+  title: { fontSize: 14, fontWeight: '700', color: colors.text, lineHeight: 19 },
   date: { fontSize: 11.5, color: colors.textMuted },
   cardFoot: {
     flexDirection: 'row',

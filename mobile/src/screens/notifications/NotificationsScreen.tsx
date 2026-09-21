@@ -1,8 +1,8 @@
 // Trung tâm thông báo trong app (GET /api/notifications).
 //
 // Kênh 'app' của bảng notifications — thứ bản web không có, ở web mọi cảnh báo đều đi
-// qua email. Backend hiện chưa sinh bản ghi ở luồng nào, nên danh sách rỗng là trạng
-// thái BÌNH THƯỜNG chứ không phải lỗi.
+// qua email. Backend hiện mới sinh bản ghi ở một luồng: đặt hàng thành công
+// (type 'order_update', kèm data.order_id); các loại còn lại chưa có nguồn sinh.
 import { useLayoutEffect, useState } from 'react';
 import { ActivityIndicator, Alert, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import Ionicons, { type IoniconsIconName } from '@react-native-vector-icons/ionicons/static';

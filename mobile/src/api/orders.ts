@@ -16,13 +16,16 @@ export interface OrderShippingAddress {
   phone_number: string | null;
 }
 
-// GET /orders — bản rút gọn, KHÔNG có danh sách sản phẩm, chỉ có số lượng dòng hàng.
+// GET /orders — bản rút gọn: không có danh sách sản phẩm đầy đủ, chỉ có số lượng dòng
+// hàng kèm tên + ảnh của sản phẩm ĐẦU TIÊN để thẻ đơn hiện "Đơn hàng: <tên>" như web.
 export interface OrderListItem {
   id: string;
   total: number;
   status: OrderStatus;
   created_at: string;
   item_count: number;
+  product_name: string | null;
+  product_image: string | null;
 }
 
 export interface OrderDetailItem {
