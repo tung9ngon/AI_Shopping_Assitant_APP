@@ -24,7 +24,7 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import Screen from '../../components/Screen';
 import AppButton from '../../components/AppButton';
 import { paymentApi } from '../../api/payments';
-import { colors, radius, shadow, spacing } from '../../theme';
+import { colors, font, radius, shadow, spacing } from '../../theme';
 import { formatVND } from '../../utils/format';
 import type { RootStackParamList } from '../../navigation/types';
 import type { PaymentStatus } from '../../types';
@@ -263,8 +263,15 @@ export default function PayosPaymentScreen() {
 const styles = StyleSheet.create({
   scroll: { padding: spacing.lg, gap: spacing.md, alignItems: 'stretch' },
 
-  amountLabel: { fontSize: 13, color: colors.textMuted, textAlign: 'center' },
-  amount: { fontSize: 30, fontWeight: '800', color: colors.primary, textAlign: 'center', letterSpacing: -0.6 },
+  amountLabel: {
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 0.9,
+    textTransform: 'uppercase',
+    color: colors.textMuted,
+    textAlign: 'center',
+  },
+  amount: { fontSize: 32, color: colors.ink, ...font.price, letterSpacing: -0.8, textAlign: 'center' },
   orderId: { fontSize: 12.5, color: colors.textMuted, textAlign: 'center', marginTop: -spacing.sm },
 
   qrCard: {
@@ -272,6 +279,8 @@ const styles = StyleSheet.create({
     padding: spacing.lg,
     backgroundColor: colors.surface,
     borderRadius: radius.xl,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.border,
     marginTop: spacing.sm,
     ...shadow.card,
   },

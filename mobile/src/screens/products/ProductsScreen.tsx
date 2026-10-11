@@ -190,7 +190,7 @@ export default function ProductsScreen() {
       <View style={styles.header}>
         <View style={styles.searchWrap}>
           <View style={styles.searchBar}>
-            <Ionicons name="search" size={18} color={colors.textMuted} />
+            <Ionicons name="search" size={18} color={colors.ink} />
             <TextInput
               value={keyword}
               onChangeText={setKeyword}
@@ -220,7 +220,7 @@ export default function ProductsScreen() {
             <Ionicons
               name="options-outline"
               size={20}
-              color={activeFilters > 0 ? colors.primary : colors.text}
+              color={activeFilters > 0 ? colors.textInverse : colors.ink}
             />
             {activeFilters > 0 ? (
               <View style={styles.filterCount}>
@@ -352,12 +352,14 @@ export default function ProductsScreen() {
 }
 
 const styles = StyleSheet.create({
-  // Cả khối đầu trang là một tấm trắng bo góc dưới, đổ bóng xuống phần danh sách —
-  // thay cho hai dải kẻ viền chồng nhau ở bản trước.
+  // Cả khối đầu trang là một tấm trắng bo góc dưới, viền tóc + bóng nhẹ tách khỏi
+  // phần danh sách — thay cho hai dải kẻ viền chồng nhau ở bản trước.
   header: {
     backgroundColor: colors.surface,
     borderBottomLeftRadius: radius.xl,
     borderBottomRightRadius: radius.xl,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.border,
     ...shadow.card,
     // Bóng phải nổi lên trên danh sách bên dưới, nếu không lưới sản phẩm che mất.
     zIndex: 2,
@@ -375,37 +377,40 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
-    backgroundColor: colors.bg,
+    backgroundColor: colors.surfaceAlt,
     borderWidth: 1,
     borderColor: colors.border,
-    borderRadius: radius.pill,
+    borderRadius: radius.lg,
     paddingHorizontal: spacing.lg,
     height: 46,
   },
-  searchInput: { flex: 1, fontSize: 14, color: colors.text, paddingVertical: 0 },
+  searchInput: { flex: 1, fontSize: 14.5, color: colors.text, paddingVertical: 0 },
   filterBtn: {
     width: 46,
     height: 46,
-    borderRadius: radius.pill,
-    backgroundColor: colors.bg,
+    borderRadius: radius.lg,
+    backgroundColor: colors.surfaceAlt,
     borderWidth: 1,
     borderColor: colors.border,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  // Đang có bộ lọc thì nút đổi sang sắc thương hiệu — huy hiệu đếm ở góc nhỏ, chỉ
-  // mình nó thì dễ bỏ sót.
-  filterBtnActive: { backgroundColor: colors.primarySoft, borderColor: colors.primary },
-  filterBtnPressed: { backgroundColor: colors.border },
+  // Đang có bộ lọc thì nút tô đặc màu mực như chip đang chọn — huy hiệu đếm ở góc
+  // nhỏ, chỉ mình nó thì dễ bỏ sót.
+  filterBtnActive: { backgroundColor: colors.ink, borderColor: colors.ink },
+  filterBtnPressed: { opacity: 0.8 },
   filterCount: {
     position: 'absolute',
-    top: 2,
-    right: 2,
-    minWidth: 16,
-    height: 16,
-    borderRadius: 8,
-    paddingHorizontal: 3,
+    top: -4,
+    right: -4,
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    paddingHorizontal: 4,
     backgroundColor: colors.primary,
+    // Viền trắng tách huy hiệu khỏi nền mực của nút.
+    borderWidth: 1.5,
+    borderColor: colors.surface,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -425,12 +430,14 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: spacing.md,
   },
-  sheetTitle: { fontSize: 18, fontWeight: '700', color: colors.text, letterSpacing: -0.2 },
+  sheetTitle: { fontSize: 19, fontWeight: '800', color: colors.text, letterSpacing: -0.4 },
   reset: { fontSize: 14, fontWeight: '600', color: colors.primary },
   groupTitle: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: colors.text,
+    fontSize: 11,
+    fontWeight: '800',
+    color: colors.textMuted,
+    letterSpacing: 0.9,
+    textTransform: 'uppercase',
     marginTop: spacing.lg,
     marginBottom: spacing.md,
   },

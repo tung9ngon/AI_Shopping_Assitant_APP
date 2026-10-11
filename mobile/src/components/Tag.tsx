@@ -14,10 +14,10 @@ export default function Tag({ label, color = 'default' }: { label: string; color
 
 const styles = StyleSheet.create({
   wrap: {
-    paddingHorizontal: spacing.md,
+    paddingHorizontal: spacing.sm + 2,
     paddingVertical: 4,
-    borderRadius: radius.pill,
+    borderRadius: radius.sm,
     alignSelf: 'flex-start',
   },
-  text: { fontSize: 12, fontWeight: '600' },
+  text: { fontSize: 12, fontWeight: '700', letterSpacing: 0.1 },
 });

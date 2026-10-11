@@ -1,8 +1,7 @@
 import { StyleSheet, Text, View } from 'react-native';
 import Ionicons, { type IoniconsIconName } from '@react-native-vector-icons/ionicons/static';
 import AppButton from './AppButton';
-import Gradient from './Gradient';
-import { colors, gradient, spacing } from '../theme';
+import { colors, radius, spacing } from '../theme';
 
 export default function EmptyState({
   icon = 'file-tray-outline',
@@ -19,9 +18,9 @@ export default function EmptyState({
 }) {
   return (
     <View style={styles.wrap}>
-      <Gradient colors={gradient.brandSoft} style={styles.iconBox}>
-        <Ionicons name={icon} size={36} color={colors.primary} />
-      </Gradient>
+      <View style={styles.iconBox}>
+        <Ionicons name={icon} size={32} color={colors.primary} />
+      </View>
       <Text style={styles.title}>{title}</Text>
       {description ? <Text style={styles.desc}>{description}</Text> : null}
       {actionTitle && onAction ? (
@@ -34,14 +33,15 @@ export default function EmptyState({
 const styles = StyleSheet.create({
   wrap: { alignItems: 'center', paddingVertical: spacing.xxl * 2, paddingHorizontal: spacing.xl },
   iconBox: {
-    width: 84,
-    height: 84,
-    borderRadius: 42,
+    width: 76,
+    height: 76,
+    borderRadius: radius.xl + 4,
+    backgroundColor: colors.primarySoft,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: spacing.lg,
   },
-  title: { fontSize: 17, fontWeight: '700', color: colors.text, textAlign: 'center' },
+  title: { fontSize: 18, fontWeight: '800', color: colors.text, textAlign: 'center', letterSpacing: -0.3 },
   desc: {
     fontSize: 14,
     color: colors.textMuted,

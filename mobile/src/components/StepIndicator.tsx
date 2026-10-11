@@ -39,7 +39,7 @@ const styles = StyleSheet.create({
     height: 2,
     backgroundColor: colors.border,
   },
-  stepLineDone: { backgroundColor: colors.primary },
+  stepLineDone: { backgroundColor: colors.ink },
   stepDot: {
     width: 30,
     height: 30,
@@ -48,7 +48,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  stepDotActive: { backgroundColor: colors.primary },
+  stepDotActive: { backgroundColor: colors.ink },
   stepNum: { fontSize: 12, fontWeight: '700', color: colors.textMuted },
   stepNumActive: { color: colors.textInverse },
   stepLabel: { fontSize: 11, color: colors.textMuted },

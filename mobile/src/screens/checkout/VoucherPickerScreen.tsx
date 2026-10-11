@@ -168,10 +168,13 @@ function VoucherRow({
   );
 }
 
+const SELECTED_BORDER = 1.5;
+const ROW_PAD = spacing.md + SELECTED_BORDER - StyleSheet.hairlineWidth;
+
 const styles = StyleSheet.create({
   flex: { flex: 1 },
   scroll: { padding: spacing.lg, paddingBottom: 110 },
-  groupTitle: { fontSize: 15, fontWeight: '700', color: colors.text },
+  groupTitle: { fontSize: 17, fontWeight: '800', letterSpacing: -0.3, color: colors.text },
   groupTitleGap: { marginTop: spacing.xl },
   groupHint: { fontSize: 12, color: colors.textMuted, marginTop: 2, marginBottom: spacing.md },
   empty: { fontSize: 13, color: colors.textMuted, marginBottom: spacing.md },
@@ -180,17 +183,17 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.md,
-    padding: spacing.md,
+    // Viền tóc khi chưa chọn, viền mực 1.5 khi chọn; phần viền dày thêm được trừ vào
+    // padding để lúc chọn nội dung không bị đẩy lệch.
+    padding: ROW_PAD,
     marginBottom: spacing.md,
     backgroundColor: colors.surface,
     borderRadius: radius.xl,
-    // Viền trong suốt khi chưa chọn: giữ nguyên kích thước thẻ để lúc chọn viền hiện
-    // ra mà nội dung không bị đẩy lệch đi 1px.
-    borderWidth: 1,
-    borderColor: 'transparent',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.border,
     ...shadow.card,
   },
-  rowSelected: { borderColor: colors.primary, backgroundColor: colors.primarySoft },
+  rowSelected: { borderWidth: SELECTED_BORDER, borderColor: colors.ink, padding: spacing.md },
   rowDisabled: { opacity: 0.5 },
   stub: {
     width: 50,
@@ -200,11 +203,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  stubSelected: { backgroundColor: colors.primary },
+  stubSelected: { backgroundColor: colors.ink },
   body: { flex: 1, gap: 1 },
   code: { fontSize: 14, fontWeight: '800', color: colors.text, letterSpacing: 0.3 },
   desc: { fontSize: 12.5, color: colors.textSecondary, lineHeight: 18 },
-  saving: { fontSize: 12, fontWeight: '700', color: colors.success, marginTop: 2 },
+  saving: { fontSize: 12, fontWeight: '700', color: colors.accent, marginTop: 2, fontVariant: ['tabular-nums'] },
   shortfall: { fontSize: 12, fontWeight: '600', color: colors.warning, marginTop: 2 },
   expiry: { fontSize: 11, color: colors.textMuted, marginTop: 3 },
 
@@ -218,8 +221,7 @@ const styles = StyleSheet.create({
     padding: spacing.lg,
     paddingBottom: spacing.xl,
     backgroundColor: colors.surface,
-    borderTopLeftRadius: radius.xl,
-    borderTopRightRadius: radius.xl,
-    ...shadow.raised,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.borderStrong,
   },
 });

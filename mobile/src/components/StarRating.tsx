@@ -7,8 +7,8 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import Ionicons from '@react-native-vector-icons/ionicons/static';
 import { colors, spacing } from '../theme';
 
-const STAR_COLOR = colors.warning;
-const STAR_EMPTY = '#d9d9d9';
+const STAR_COLOR = colors.star;
+const STAR_EMPTY = colors.borderStrong;
 
 export default function StarRating({
   value,

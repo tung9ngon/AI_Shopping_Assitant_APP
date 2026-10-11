@@ -1,12 +1,11 @@
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import Ionicons from '@react-native-vector-icons/ionicons/static';
+import Ionicons, { type IoniconsIconName } from '@react-native-vector-icons/ionicons/static';
 import { Pressable, StyleSheet, View } from 'react-native';
 
-import Gradient from '../components/Gradient';
 import { useCart } from '../context/CartContext';
-import { colors, gradient, radius, shadow, useTabBarHeight, tabBarContentHeight } from '../theme';
+import { colors, radius, shadow, useTabBarHeight, tabBarContentHeight } from '../theme';
 import type { RootStackParamList, TabParamList } from './types';
 
 import HomeScreen from '../screens/home/HomeScreen';
@@ -41,19 +40,28 @@ const Stack = createNativeStackNavigator<RootStackParamList>();
 // Nút trợ lý AI ở giữa thanh tab được vẽ nổi lên — mục 3.1.b của tài liệu giới thiệu
 // coi trò chuyện là giao diện chính của sản phẩm, không phải widget phụ như bản web.
 function ChatTabIcon({ focused }: { focused: boolean }) {
-  // Đang mở thì nút tô chuyển sắc, không mở thì xám đặc — nút nổi giữa thanh tab là
-  // điểm nhấn của cả app, đổi màu thôi chưa đủ để thấy nó đang được chọn.
-  if (focused) {
-    return (
-      <Gradient colors={gradient.brand} style={[styles.chatBubble, styles.chatBubbleActive]}>
-        <Ionicons name="chatbubble-ellipses" size={22} color={colors.textInverse} />
-      </Gradient>
-    );
-  }
+  // Ô vuông bo màu mực nổi lên khỏi thanh tab; đang mở thì đổi sang xanh ngọc thương
+  // hiệu — nút giữa là điểm nhấn của cả app, phải thấy ngay nó đang được chọn.
   return (
-    <View style={styles.chatBubble}>
-      <Ionicons name="chatbubble-ellipses" size={22} color={colors.textInverse} />
+    <View style={[styles.chatBubble, focused && styles.chatBubbleActive]}>
+      <Ionicons
+        name={focused ? 'chatbubbles' : 'chatbubbles-outline'}
+        size={22}
+        color={colors.textInverse}
+      />
     </View>
+  );
+}
+
+// Tab đang chọn dùng glyph đặc, tab khác dùng glyph nét — khác cả hình lẫn màu,
+// người mù màu vẫn nhận ra tab hiện tại.
+function tabIcon(name: string) {
+  return ({ color, size, focused }: { color: string; size: number; focused: boolean }) => (
+    <Ionicons
+      name={(focused ? name : `${name}-outline`) as IoniconsIconName}
+      size={size - 1}
+      color={color}
+    />
   );
 }
 
@@ -67,7 +75,7 @@ function MainTabs() {
     <Tab.Navigator
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: colors.primary,
+        tabBarActiveTintColor: colors.ink,
         tabBarInactiveTintColor: colors.textMuted,
         tabBarStyle: [
           styles.tabBar,
@@ -81,7 +89,7 @@ function MainTabs() {
         component={HomeScreen}
         options={{
           title: 'Trang chủ',
-          tabBarIcon: ({ color, size }) => <Ionicons name="home-outline" size={size} color={color} />,
+          tabBarIcon: tabIcon('home'),
         }}
       />
       <Tab.Screen
@@ -89,7 +97,7 @@ function MainTabs() {
         component={ProductsScreen}
         options={{
           title: 'Sản phẩm',
-          tabBarIcon: ({ color, size }) => <Ionicons name="grid-outline" size={size} color={color} />,
+          tabBarIcon: tabIcon('grid'),
         }}
       />
       <Tab.Screen
@@ -108,7 +116,7 @@ function MainTabs() {
           title: 'Giỏ hàng',
           tabBarBadge: itemCount > 0 ? itemCount : undefined,
           tabBarBadgeStyle: styles.badge,
-          tabBarIcon: ({ color, size }) => <Ionicons name="cart-outline" size={size} color={color} />,
+          tabBarIcon: tabIcon('cart'),
         }}
       />
       <Tab.Screen
@@ -116,7 +124,7 @@ function MainTabs() {
         component={AccountScreen}
         options={{
           title: 'Tài khoản',
-          tabBarIcon: ({ color, size }) => <Ionicons name="person-outline" size={size} color={color} />,
+          tabBarIcon: tabIcon('person'),
         }}
       />
     </Tab.Navigator>
@@ -148,7 +156,7 @@ export default function RootNavigator() {
         screenOptions={{
           headerShadowVisible: false,
           headerStyle: { backgroundColor: colors.surface },
-          headerTitleStyle: { fontSize: 16, fontWeight: '700', color: colors.text },
+          headerTitleStyle: { fontSize: 17, fontWeight: '700', color: colors.text },
           headerTintColor: colors.text,
           // iOS lấy tiêu đề màn TRƯỚC làm nhãn nút quay lại; màn 'Tabs' không đặt
           // tiêu đề nên nhãn rơi về tên route và hiện chữ "Tabs". Bỏ hẳn phần chữ,
@@ -250,36 +258,30 @@ const styles = StyleSheet.create({
   // Cần chừa tối thiểu: icon 24 + nhãn 17 + padding trong của ô 10 = 51.
   tabBar: {
     backgroundColor: colors.surface,
-    // Bỏ đường kẻ mảnh, tách khỏi nội dung bằng đổ bóng hắt lên như các thanh cố
-    // định khác trong app (thanh đặt hàng, thanh tổng tiền).
-    borderTopWidth: 0,
-    borderTopLeftRadius: radius.xl,
-    borderTopRightRadius: radius.xl,
+    // Thanh phẳng, chỉ một đường kẻ tóc phía trên — như thanh tab hệ thống, để nội
+    // dung là thứ nổi bật chứ không phải khung điều hướng.
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.borderStrong,
     paddingTop: 6,
     // height và paddingBottom đặt động trong MainTabs theo inset đáy của máy.
-    ...shadow.raised,
   },
   tabLabel: { fontSize: 11, lineHeight: 17, fontWeight: '600' },
   chatLabel: { marginTop: 2 },
   chatBubble: {
-    width: 46,
-    height: 46,
-    borderRadius: 23,
-    marginTop: -15,
-    backgroundColor: colors.textMuted,
+    width: 48,
+    height: 48,
+    borderRadius: radius.lg,
+    marginTop: -16,
+    backgroundColor: colors.ink,
     alignItems: 'center',
     justifyContent: 'center',
+    // Viền trắng tách ô nổi khỏi mép thanh tab như một vết cắt.
+    borderWidth: 3,
+    borderColor: colors.surface,
     ...shadow.card,
   },
-  chatBubbleActive: {
-    backgroundColor: 'transparent',
-    shadowColor: colors.primaryDark,
-    shadowOpacity: 0.35,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 5 },
-    elevation: 6,
-  },
-  badge: { backgroundColor: colors.primary, fontSize: 10 },
+  chatBubbleActive: { backgroundColor: colors.primary },
+  badge: { backgroundColor: colors.accent, fontSize: 10, fontWeight: '700' },
   headerExit: { padding: 4, marginLeft: -4, borderRadius: radius.pill },
   headerExitPressed: { backgroundColor: colors.bg },
 });

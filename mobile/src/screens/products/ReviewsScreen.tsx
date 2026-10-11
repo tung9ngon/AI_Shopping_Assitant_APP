@@ -13,10 +13,9 @@ import AppButton from '../../components/AppButton';
 import EmptyState from '../../components/EmptyState';
 import LoadState from '../../components/LoadState';
 import StarRating from '../../components/StarRating';
-import Gradient from '../../components/Gradient';
 import { productApi } from '../../api/products';
 import { useApi } from '../../hooks/useApi';
-import { colors, gradient, radius, shadow, spacing } from '../../theme';
+import { colors, radius, shadow, spacing } from '../../theme';
 import { avatarInitial, formatDate } from '../../utils/format';
 import { getItems, primaryImageOf } from '../../types';
 import type { RootStackParamList } from '../../navigation/types';
@@ -96,9 +95,9 @@ export default function ReviewsScreen() {
         renderItem={({ item }) => (
           <View style={styles.card}>
             <View style={styles.head}>
-              <Gradient colors={gradient.brandSoft} style={styles.avatar}>
+              <View style={styles.avatar}>
                 <Text style={styles.avatarText}>{avatarInitial(item.user_name)}</Text>
-              </Gradient>
+              </View>
               <View style={styles.flex}>
                 <Text style={styles.name}>{item.user_name}</Text>
                 <View style={styles.metaRow}>
@@ -149,21 +148,38 @@ const styles = StyleSheet.create({
     marginBottom: spacing.xs,
     backgroundColor: colors.surface,
     borderRadius: radius.xl,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.border,
     ...shadow.card,
   },
-  scoreBox: { alignItems: 'center', gap: spacing.xs },
-  score: { fontSize: 30, fontWeight: '800', color: colors.text, letterSpacing: -0.6 },
+  // Vạch dọc mảnh tách điểm tổng khỏi tên sản phẩm — hai thông tin khác loại.
+  scoreBox: {
+    alignItems: 'center',
+    gap: spacing.xs,
+    paddingRight: spacing.lg,
+    borderRightWidth: StyleSheet.hairlineWidth,
+    borderRightColor: colors.borderStrong,
+  },
+  score: {
+    fontSize: 32,
+    fontWeight: '800',
+    color: colors.ink,
+    letterSpacing: -0.8,
+    fontVariant: ['tabular-nums'],
+  },
   // Chưa có điểm thì chỗ này là dấu gạch ngang. Để nguyên cỡ 30 chữ đen đậm thì nó
   // thành một vệt đen trông như ảnh lỗi — thu nhỏ và làm nhạt đi.
   scoreEmpty: { fontSize: 20, color: colors.textMuted },
-  productName: { fontSize: 14, fontWeight: '600', color: colors.text, lineHeight: 20 },
-  count: { fontSize: 12.5, color: colors.textMuted, marginTop: spacing.xs },
+  productName: { fontSize: 15, fontWeight: '700', color: colors.text, lineHeight: 21, letterSpacing: -0.2 },
+  count: { fontSize: 12.5, fontWeight: '600', color: colors.textMuted, marginTop: spacing.xs },
 
   card: {
     padding: spacing.lg,
     gap: spacing.sm,
     backgroundColor: colors.surface,
     borderRadius: radius.xl,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.border,
     ...shadow.card,
   },
   head: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
@@ -171,6 +187,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
+    backgroundColor: colors.primarySoft,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -186,9 +203,8 @@ const styles = StyleSheet.create({
     padding: spacing.lg,
     gap: spacing.sm,
     backgroundColor: colors.surface,
-    borderTopLeftRadius: radius.xl,
-    borderTopRightRadius: radius.xl,
-    ...shadow.raised,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.borderStrong,
   },
   noteRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
   note: { flex: 1, fontSize: 11.5, color: colors.textMuted, lineHeight: 16 },

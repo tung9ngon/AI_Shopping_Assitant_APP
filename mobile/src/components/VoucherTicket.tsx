@@ -5,8 +5,7 @@
 // (màn Chọn mã giảm giá), trang chủ không có ô nhập mã.
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import Ionicons from '@react-native-vector-icons/ionicons/static';
-import Gradient from './Gradient';
-import { colors, gradient, radius, shadow, spacing } from '../theme';
+import { colors, radius, shadow, spacing } from '../theme';
 import { formatDateShort, formatVND } from '../utils/format';
 import type { DiscountCodeItem } from '../api/discounts';
 
@@ -50,15 +49,16 @@ export default function VoucherTicket({
       onPress={onPress}
       style={({ pressed }) => [styles.ticket, pressed && styles.pressed]}
     >
-      {/* Cuống vé tô hai màu theo loại: cam cho giảm tiền hàng, xanh cho freeship —
-          lướt qua băng là phân biệt được. */}
-      <Gradient colors={isShip ? gradient.success : gradient.brand} style={styles.stub}>
+      {/* Cuống vé tô hai màu theo loại: mực cho giảm tiền hàng, xanh ngọc cho
+          freeship — lướt qua băng là phân biệt được. */}
+      <View style={[styles.stub, { backgroundColor: isShip ? colors.primary : colors.ink }]}>
         <Ionicons
           name={isShip ? 'car-outline' : 'pricetag-outline'}
-          size={22}
+          size={20}
           color={colors.textInverse}
         />
-      </Gradient>
+        <Text style={styles.stubLabel}>{isShip ? 'SHIP' : 'SALE'}</Text>
+      </View>
 
       <View style={styles.body}>
         <Text style={styles.headline} numberOfLines={1}>
@@ -96,6 +96,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     borderRadius: radius.lg,
     backgroundColor: colors.surface,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.border,
     ...shadow.card,
   },
   pressed: { opacity: 0.9, transform: [{ scale: 0.98 }] },
@@ -103,11 +105,13 @@ const styles = StyleSheet.create({
     width: STUB_WIDTH,
     alignItems: 'center',
     justifyContent: 'center',
+    gap: 4,
     borderTopLeftRadius: radius.lg,
     borderBottomLeftRadius: radius.lg,
   },
+  stubLabel: { fontSize: 9, fontWeight: '800', color: colors.textInverse, letterSpacing: 1.2, opacity: 0.85 },
   body: { flex: 1, padding: spacing.md, gap: 2 },
-  headline: { fontSize: 15, fontWeight: '800', color: colors.text, letterSpacing: -0.2 },
+  headline: { fontSize: 16, fontWeight: '800', color: colors.text, letterSpacing: -0.4 },
   condition: { fontSize: 11.5, color: colors.textSecondary, lineHeight: 16 },
   footer: {
     flexDirection: 'row',
@@ -121,12 +125,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.sm,
     paddingVertical: 3,
     borderRadius: radius.sm,
-    backgroundColor: colors.primarySoft,
+    backgroundColor: colors.surfaceAlt,
     borderWidth: 1,
     borderStyle: 'dashed',
-    borderColor: colors.primary,
+    borderColor: colors.borderStrong,
   },
-  code: { fontSize: 11.5, fontWeight: '800', color: colors.primary, letterSpacing: 0.6 },
+  code: { fontSize: 11.5, fontWeight: '800', color: colors.text, letterSpacing: 0.8 },
   expiry: { fontSize: 10.5, color: colors.textMuted },
   notch: {
     position: 'absolute',

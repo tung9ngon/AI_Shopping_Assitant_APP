@@ -20,7 +20,7 @@ import Tag from '../../components/Tag';
 import { orderApi } from '../../api/orders';
 import { getErrorMessage } from '../../api/client';
 import { useApi } from '../../hooks/useApi';
-import { colors, radius, spacing, tagPalette } from '../../theme';
+import { colors, font, radius, spacing, tagPalette } from '../../theme';
 import { ORDER_STATUS_COLOR, ORDER_STATUS_LABEL, formatDate, formatVND } from '../../utils/format';
 import type { RootStackParamList } from '../../navigation/types';
 import type { OrderStatus } from '../../types';
@@ -92,12 +92,21 @@ export default function OrderDetailScreen() {
           {status !== 'cancelled' ? (
             <View style={styles.timeline}>
               {TIMELINE.map((step, i) => {
+                // Mốc đã qua tô mực; mốc hiện tại tô xanh ngọc để mắt dừng đúng chỗ đơn
+                // đang nằm, thay vì cả dải cùng một màu.
                 const done = i <= reachedIndex;
+                const current = i === reachedIndex;
                 return (
                   <View key={step.status} style={styles.step}>
                     <View style={styles.stepIconWrap}>
                       {i > 0 ? <View style={[styles.stepLine, done && styles.stepLineDone]} /> : null}
-                      <View style={[styles.stepIcon, done && styles.stepIconDone]}>
+                      <View
+                        style={[
+                          styles.stepIcon,
+                          done && styles.stepIconDone,
+                          current && styles.stepIconCurrent,
+                        ]}
+                      >
                         <Ionicons
                           name={step.icon}
                           size={15}
@@ -105,7 +114,15 @@ export default function OrderDetailScreen() {
                         />
                       </View>
                     </View>
-                    <Text style={[styles.stepLabel, done && styles.stepLabelDone]}>{step.label}</Text>
+                    <Text
+                      style={[
+                        styles.stepLabel,
+                        done && styles.stepLabelDone,
+                        current && styles.stepLabelCurrent,
+                      ]}
+                    >
+                      {step.label}
+                    </Text>
                   </View>
                 );
               })}
@@ -210,7 +227,7 @@ const styles = StyleSheet.create({
   card: { marginTop: 0 },
 
   statusHead: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md },
-  orderId: { fontSize: 14, fontWeight: '700', color: colors.text },
+  orderId: { fontSize: 18, fontWeight: '800', color: colors.text, letterSpacing: -0.3, fontVariant: ['tabular-nums'] },
   date: { fontSize: 12, color: colors.textMuted, marginTop: 2 },
 
   timeline: { flexDirection: 'row', marginTop: spacing.xl },
@@ -223,18 +240,22 @@ const styles = StyleSheet.create({
     height: 2,
     backgroundColor: colors.border,
   },
-  stepLineDone: { backgroundColor: colors.primary },
+  stepLineDone: { backgroundColor: colors.ink },
   stepIcon: {
     width: 34,
     height: 34,
     borderRadius: 17,
-    backgroundColor: colors.bg,
+    backgroundColor: colors.surfaceAlt,
+    borderWidth: 1,
+    borderColor: colors.border,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  stepIconDone: { backgroundColor: colors.primary },
+  stepIconDone: { backgroundColor: colors.ink, borderColor: colors.ink },
+  stepIconCurrent: { backgroundColor: colors.primary, borderColor: colors.primary },
   stepLabel: { fontSize: 11, color: colors.textMuted, textAlign: 'center' },
   stepLabelDone: { color: colors.text, fontWeight: '600' },
+  stepLabelCurrent: { color: colors.primary, fontWeight: '800' },
 
   cancelledNote: {
     flexDirection: 'row',
@@ -251,13 +272,13 @@ const styles = StyleSheet.create({
   addrText: { fontSize: 13, color: colors.textSecondary, lineHeight: 19, marginTop: 3 },
 
   itemRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingVertical: spacing.md },
-  itemRowBorder: { borderTopWidth: 1, borderTopColor: colors.border },
+  itemRowBorder: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border },
   itemName: { fontSize: 13, color: colors.text, lineHeight: 18 },
   itemRight: { alignItems: 'flex-end', gap: spacing.xs },
   reviewLink: { flexDirection: 'row', alignItems: 'center', gap: 3 },
   reviewLinkText: { fontSize: 12, fontWeight: '600', color: colors.primary },
-  itemQty: { fontSize: 12, color: colors.textMuted, marginTop: 2 },
-  itemTotal: { fontSize: 13.5, fontWeight: '700', color: colors.text },
+  itemQty: { fontSize: 12, color: colors.textMuted, marginTop: 2, fontVariant: ['tabular-nums'] },
+  itemTotal: { fontSize: 14, color: colors.ink, ...font.price },
 
 
   cancelBtn: { marginTop: spacing.sm },

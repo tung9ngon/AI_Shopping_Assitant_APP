@@ -55,7 +55,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  boxActive: { borderColor: colors.primary },
-  digit: { fontSize: 20, fontWeight: '700', color: colors.text },
+  boxActive: { borderColor: colors.ink, borderWidth: 2 },
+  digit: { fontSize: 22, fontWeight: '700', color: colors.text, fontVariant: ['tabular-nums'] },
   hiddenInput: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, opacity: 0, fontSize: 1 },
 });

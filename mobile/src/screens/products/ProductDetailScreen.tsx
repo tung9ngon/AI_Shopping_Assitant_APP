@@ -28,7 +28,6 @@ import SectionHeader from '../../components/SectionHeader';
 import StarRating from '../../components/StarRating';
 import TextField from '../../components/TextField';
 import Card from '../../components/Card';
-import Gradient from '../../components/Gradient';
 import LoadState from '../../components/LoadState';
 import { useApi } from '../../hooks/useApi';
 import { useQuickAdd } from '../../hooks/useQuickAdd';
@@ -36,7 +35,7 @@ import { productApi } from '../../api/products';
 import { priceAlertApi } from '../../api/priceAlerts';
 import { getErrorMessage } from '../../api/client';
 import { useCart } from '../../context/CartContext';
-import { colors, gradient, radius, shadow, spacing } from '../../theme';
+import { colors, font, radius, spacing } from '../../theme';
 import { formatVND } from '../../utils/format';
 import { FREE_SHIPPING_THRESHOLD } from '../../constants';
 import { getItems } from '../../types';
@@ -192,10 +191,11 @@ export default function ProductDetailScreen() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: ACTION_BAR_HEIGHT + insets.bottom }}
       >
-        {/* Ảnh đặt trên nền cam rất nhạt thay vì nền trắng: ảnh sản phẩm phần lớn
-            nền trắng, để trên nền trắng thì trông như trôi lơ lửng. Nhiều ảnh thì
-            vuốt ngang từng trang, dãy chấm bên dưới báo đang ở ảnh nào. */}
-        <Gradient colors={gradient.brandSoft} style={styles.gallery}>
+        {/* Ảnh đặt trên nền giấy ấm thay vì nền trắng: ảnh sản phẩm phần lớn nền
+            trắng, để trên nền trắng thì trông như trôi lơ lửng; nền giấy trơn cũng tách
+            được khối thông tin trắng đè lên bên dưới. Nhiều ảnh thì vuốt ngang từng
+            trang, dãy chấm bên dưới báo đang ở ảnh nào. */}
+        <View style={styles.gallery}>
           <FlatList
             horizontal
             pagingEnabled
@@ -206,7 +206,12 @@ export default function ProductDetailScreen() {
             onMomentumScrollEnd={onGalleryScrollEnd}
             renderItem={({ item }) => (
               <View style={[styles.galleryPage, { width }]}>
-                <ProductThumb uri={item?.image_url} icon={product.category?.icon} size={width * 0.66} />
+                <ProductThumb
+                  uri={item?.image_url}
+                  icon={product.category?.icon}
+                  categoryName={product.category?.name}
+                  size={width * 0.66}
+                />
               </View>
             )}
           />
@@ -217,7 +222,7 @@ export default function ProductDetailScreen() {
               ))}
             </View>
           ) : null}
-        </Gradient>
+        </View>
 
         {/* Khối thông tin bo góc trên và kéo lên đè lên mép dưới phần ảnh. */}
         <View style={styles.block}>
@@ -231,7 +236,9 @@ export default function ProductDetailScreen() {
             <Rating value={product.rating} count={product.review_count} size={14} />
           </View>
 
-          <Text style={styles.price}>{formatVND(price)}</Text>
+          <View style={styles.priceRow}>
+            <Text style={styles.price}>{formatVND(price)}</Text>
+          </View>
 
           {product.tags?.length ? (
             <View style={styles.tagRow}>
@@ -266,9 +273,11 @@ export default function ProductDetailScreen() {
             onPress={() => setAlertOpen(true)}
             style={({ pressed }) => [styles.alertRow, pressed && styles.alertRowPressed]}
           >
-            <Ionicons name="notifications-outline" size={18} color={colors.primary} />
+            <View style={styles.alertIcon}>
+              <Ionicons name="notifications-outline" size={17} color={colors.primary} />
+            </View>
             <Text style={styles.alertText}>Báo tôi khi sản phẩm này giảm giá</Text>
-            <Ionicons name="chevron-forward" size={16} color={colors.primary} />
+            <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
           </Pressable>
         </View>
 
@@ -416,6 +425,7 @@ const ACTION_BAR_HEIGHT = BUTTON_HEIGHT + spacing.md * 2;
 
 const styles = StyleSheet.create({
   gallery: {
+    backgroundColor: colors.bg,
     paddingTop: spacing.lg,
     paddingBottom: spacing.xxl,
   },
@@ -430,7 +440,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 6,
   },
-  dot: { width: 6, height: 6, borderRadius: 3, backgroundColor: 'rgba(242,109,33,0.28)' },
+  dot: { width: 6, height: 6, borderRadius: 3, backgroundColor: colors.borderStrong },
   dotActive: { width: 18, backgroundColor: colors.primary },
 
   block: {
@@ -443,22 +453,32 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.lg,
     gap: spacing.sm,
   },
+  // Thứ bậc: thương hiệu (nhãn nhỏ xanh ngọc) → tên (to, đậm) → giá (to nhất, màu
+  // mực). Giá là con số người mua tìm đầu tiên nên được cỡ chữ lớn nhất khối.
   brand: {
     fontSize: 11,
-    fontWeight: '700',
-    color: colors.textMuted,
-    letterSpacing: 0.8,
+    fontWeight: '800',
+    color: colors.primary,
+    letterSpacing: 1,
     textTransform: 'uppercase',
   },
-  name: { fontSize: 20, fontWeight: '700', color: colors.text, lineHeight: 27, letterSpacing: -0.3 },
+  name: { fontSize: 21, fontWeight: '800', color: colors.text, lineHeight: 28, letterSpacing: -0.5 },
   metaRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
-  price: { fontSize: 27, fontWeight: '800', color: colors.primary, marginTop: spacing.xs, letterSpacing: -0.5 },
+  priceRow: {
+    marginTop: spacing.xs,
+    paddingTop: spacing.md,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.border,
+  },
+  price: { fontSize: 28, color: colors.ink, ...font.price },
   tagRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginTop: spacing.xs },
   tag: {
     paddingHorizontal: spacing.md,
     paddingVertical: 5,
     borderRadius: radius.pill,
-    backgroundColor: colors.bg,
+    backgroundColor: colors.surfaceAlt,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.border,
   },
   tagText: { fontSize: 12, color: colors.textSecondary, fontWeight: '600' },
 
@@ -467,10 +487,12 @@ const styles = StyleSheet.create({
     marginTop: spacing.md,
     paddingVertical: spacing.md,
     borderRadius: radius.lg,
-    backgroundColor: colors.bg,
+    backgroundColor: colors.surfaceAlt,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.border,
   },
   trustItem: { flex: 1, alignItems: 'center', gap: spacing.xs, paddingHorizontal: spacing.sm },
-  trustItemBorder: { borderLeftWidth: 1, borderLeftColor: colors.border },
+  trustItemBorder: { borderLeftWidth: StyleSheet.hairlineWidth, borderLeftColor: colors.borderStrong },
   trustText: { fontSize: 11, color: colors.textSecondary, textAlign: 'center', lineHeight: 15 },
 
   qtyRow: {
@@ -479,29 +501,41 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginTop: spacing.md,
   },
-  qtyLabel: { fontSize: 14, fontWeight: '600', color: colors.textSecondary },
+  qtyLabel: { fontSize: 14, fontWeight: '700', color: colors.text },
+  // Hàng có viền mảnh trên nền trắng, chỉ ô biểu tượng mang màu thương hiệu — cả hàng
+  // nền xanh thì tranh sự chú ý với giá và nút mua.
   alertRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.sm,
+    gap: spacing.md,
     marginTop: spacing.md,
     padding: spacing.md,
     borderRadius: radius.lg,
-    backgroundColor: colors.primarySoft,
+    backgroundColor: colors.surface,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.borderStrong,
   },
-  alertRowPressed: { backgroundColor: '#ffe2ce' },
-  alertText: { flex: 1, fontSize: 13, fontWeight: '600', color: colors.primary },
+  alertRowPressed: { backgroundColor: colors.surfaceAlt },
+  alertIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: radius.md,
+    backgroundColor: colors.primarySoft,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  alertText: { flex: 1, fontSize: 13.5, fontWeight: '600', color: colors.text },
 
   card: { marginHorizontal: spacing.lg, marginTop: spacing.md },
   description: { fontSize: 14, color: colors.textSecondary, lineHeight: 22 },
   specRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: spacing.sm, gap: spacing.lg },
-  specRowBorder: { borderTopWidth: 1, borderTopColor: colors.border },
+  specRowBorder: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border },
   specKey: { fontSize: 14, color: colors.textMuted },
   specValue: { fontSize: 14, color: colors.text, fontWeight: '600', flexShrink: 1, textAlign: 'right' },
 
   noReview: { fontSize: 13.5, color: colors.textMuted },
   reviewRow: { gap: spacing.xs, paddingVertical: spacing.sm },
-  reviewRowBorder: { borderTopWidth: 1, borderTopColor: colors.border },
+  reviewRowBorder: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border },
   reviewHead: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   reviewName: { fontSize: 13.5, fontWeight: '700', color: colors.text },
   reviewTitle: { fontSize: 13, fontWeight: '600', color: colors.text },
@@ -513,7 +547,7 @@ const styles = StyleSheet.create({
     gap: spacing.xs,
     marginTop: spacing.md,
     paddingTop: spacing.md,
-    borderTopWidth: 1,
+    borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: colors.border,
   },
   reviewMorePressed: { opacity: 0.6 },
@@ -532,13 +566,13 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
     padding: spacing.md,
     backgroundColor: colors.surface,
-    borderTopLeftRadius: radius.xl,
-    borderTopRightRadius: radius.xl,
-    ...shadow.raised,
+    // Viền tóc đậm thay cho bóng hắt lên: thanh mua phẳng, mép rõ trên mọi nội dung.
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.borderStrong,
   },
   actionPrice: { flexShrink: 1, minWidth: 92, paddingLeft: spacing.xs },
-  actionLabel: { fontSize: 11, color: colors.textMuted },
-  actionTotal: { fontSize: 18, fontWeight: '800', color: colors.primary, letterSpacing: -0.4 },
+  actionLabel: { fontSize: 11, fontWeight: '600', color: colors.textMuted },
+  actionTotal: { fontSize: 19, color: colors.ink, ...font.price },
   flexBtn: { flex: 1 },
 
   backdrop: {
@@ -547,7 +581,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(0,0,0,0.4)',
+    backgroundColor: 'rgba(16,18,17,0.45)',
   },
   dialogWrap: { flex: 1, justifyContent: 'center', paddingHorizontal: spacing.xl },
   dialog: {
@@ -556,7 +590,7 @@ const styles = StyleSheet.create({
     padding: spacing.xl,
     gap: spacing.md,
   },
-  dialogTitle: { fontSize: 18, fontWeight: '700', color: colors.text },
+  dialogTitle: { fontSize: 18, fontWeight: '800', color: colors.text, letterSpacing: -0.3 },
   dialogDesc: { fontSize: 14, color: colors.textSecondary, lineHeight: 20 },
   dialogActions: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.sm },
 });

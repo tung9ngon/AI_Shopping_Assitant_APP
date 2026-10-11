@@ -17,7 +17,7 @@ export default function Rating({
   }
   return (
     <View style={styles.row}>
-      <Ionicons name="star" size={size} color={colors.warning} />
+      <Ionicons name="star" size={size} color={colors.star} />
       <Text style={[styles.score, { fontSize: size }]}>{score.toFixed(1)}</Text>
       {count != null ? <Text style={[styles.muted, { fontSize: size }]}>({count})</Text> : null}
     </View>

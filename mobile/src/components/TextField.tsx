@@ -53,7 +53,7 @@ export default function TextField({
 
 const styles = StyleSheet.create({
   wrap: { gap: spacing.xs },
-  label: { fontSize: 13, fontWeight: '600', color: colors.textSecondary, marginLeft: 2 },
+  label: { fontSize: 13, fontWeight: '600', color: colors.text, marginLeft: 2 },
   box: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -61,13 +61,13 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surfaceAlt,
     borderWidth: 1,
     borderColor: colors.border,
-    borderRadius: radius.lg,
+    borderRadius: radius.md + 2,
     paddingHorizontal: spacing.md,
     minHeight: 50,
   },
   // Đang gõ thì ô sáng lên (nền trắng) chứ không chỉ đổi màu viền — viền 1px trên
   // màn hình điện thoại là tín hiệu quá nhỏ.
-  boxFocused: { borderColor: colors.primary, backgroundColor: colors.surface },
+  boxFocused: { borderColor: colors.ink, backgroundColor: colors.surface },
   boxError: { borderColor: colors.danger },
   input: { flex: 1, fontSize: 15, color: colors.text, paddingVertical: spacing.sm },
   error: { fontSize: 12, color: colors.danger, marginLeft: 2 },

@@ -45,7 +45,7 @@ export default function AppButton({
       ]}
     >
       {loading ? (
-        <ActivityIndicator size="small" color={variant === 'primary' ? colors.textInverse : colors.primary} />
+        <ActivityIndicator size="small" color={variant === 'primary' ? colors.textInverse : colors.ink} />
       ) : (
         <View style={styles.content}>
           {icon ? <Ionicons name={icon} size={18} color={labelColor[variant]} /> : null}
@@ -58,14 +58,16 @@ export default function AppButton({
 
 const labelColor: Record<Variant, string> = {
   primary: colors.textInverse,
-  outline: colors.primary,
+  outline: colors.ink,
   ghost: colors.textSecondary,
   danger: colors.danger,
 };
 
 const variantStyle: Record<Variant, ViewStyle> = {
-  primary: { backgroundColor: colors.primary },
-  outline: { backgroundColor: 'transparent', borderWidth: 1, borderColor: colors.primary },
+  // Nút chính màu mực: nổi bật trên mọi nền mà không cần màu rực. Xanh ngọc để dành
+  // cho điểm nhấn nhỏ — tô cả nút lớn bằng nó thì thương hiệu thành ồn.
+  primary: { backgroundColor: colors.ink },
+  outline: { backgroundColor: colors.surface, borderWidth: 1.5, borderColor: colors.ink },
   ghost: { backgroundColor: colors.surfaceAlt },
   danger: { backgroundColor: 'transparent', borderWidth: 1, borderColor: colors.danger },
 };
@@ -79,15 +81,15 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   primaryShadow: {
-    shadowColor: colors.primaryDark,
-    shadowOpacity: 0.22,
-    shadowRadius: 8,
+    shadowColor: colors.ink,
+    shadowOpacity: 0.18,
+    shadowRadius: 10,
     shadowOffset: { width: 0, height: 4 },
     elevation: 4,
   },
   block: { alignSelf: 'stretch' },
   content: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  label: { fontSize: 15, fontWeight: '700' },
+  label: { fontSize: 15, fontWeight: '700', letterSpacing: -0.1 },
   disabled: { opacity: 0.45 },
-  pressed: { opacity: 0.85, transform: [{ scale: 0.98 }] },
+  pressed: { opacity: 0.88, transform: [{ scale: 0.985 }] },
 });

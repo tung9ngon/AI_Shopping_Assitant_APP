@@ -26,7 +26,7 @@ export default function BottomSheet({
 }
 
 const styles = StyleSheet.create({
-  backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.35)' },
+  backdrop: { flex: 1, backgroundColor: 'rgba(16,18,17,0.45)' },
   sheet: {
     backgroundColor: colors.surface,
     borderTopLeftRadius: radius.xl,
@@ -37,8 +37,8 @@ const styles = StyleSheet.create({
     ...shadow.raised,
   },
   handle: {
-    width: 40,
-    height: 4,
+    width: 36,
+    height: 5,
     borderRadius: 2,
     backgroundColor: colors.borderStrong,
     alignSelf: 'center',

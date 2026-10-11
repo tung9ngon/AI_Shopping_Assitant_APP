@@ -1,6 +1,6 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import Ionicons from '@react-native-vector-icons/ionicons/static';
-import { colors, spacing } from '../theme';
+import { colors, radius, spacing } from '../theme';
 
 export default function SectionHeader({
   title,
@@ -29,7 +29,7 @@ export default function SectionHeader({
           style={({ pressed }) => [styles.action, pressed && styles.actionPressed]}
         >
           <Text style={styles.actionText}>{actionLabel}</Text>
-          <Ionicons name="chevron-forward" size={14} color={colors.primary} />
+          <Ionicons name="arrow-forward" size={14} color={colors.text} />
         </Pressable>
       ) : null}
     </View>
@@ -39,16 +39,27 @@ export default function SectionHeader({
 const styles = StyleSheet.create({
   row: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-end',
     justifyContent: 'space-between',
     gap: spacing.md,
     paddingHorizontal: spacing.lg,
     marginBottom: spacing.md,
   },
   titleBox: { flex: 1, gap: 2 },
-  title: { fontSize: 18, fontWeight: '800', color: colors.text, letterSpacing: -0.3 },
-  subtitle: { fontSize: 12.5, color: colors.textMuted },
-  action: { flexDirection: 'row', alignItems: 'center', gap: 2 },
-  actionPressed: { opacity: 0.6 },
-  actionText: { fontSize: 13, fontWeight: '700', color: colors.primary },
+  title: { fontSize: 20, fontWeight: '800', color: colors.text, letterSpacing: -0.5 },
+  subtitle: { fontSize: 13, color: colors.textMuted },
+  // "Xem tất cả" dạng viên viền mảnh: là nút thật, không phải dòng chữ lẻ loi.
+  action: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: spacing.md,
+    height: 30,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+  },
+  actionPressed: { backgroundColor: colors.surfaceAlt },
+  actionText: { fontSize: 12.5, fontWeight: '700', color: colors.text },
 });

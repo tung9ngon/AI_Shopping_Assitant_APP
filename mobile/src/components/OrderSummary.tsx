@@ -1,7 +1,7 @@
 // Các dòng bảng tính tiền (tạm tính / phí ship / giảm giá) và dòng tổng cộng —
 // dùng chung cho màn Đặt hàng và Chi tiết đơn hàng, trước đây mỗi màn một bản chép.
 import { StyleSheet, Text, View } from 'react-native';
-import { colors, spacing } from '../theme';
+import { colors, font, spacing } from '../theme';
 
 export function SummaryRow({
   label,
@@ -32,7 +32,7 @@ export function GrandTotalRow({ label = 'Tổng cộng', value }: { label?: stri
 const styles = StyleSheet.create({
   row: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 4 },
   label: { fontSize: 13.5, color: colors.textSecondary, flexShrink: 1 },
-  value: { fontSize: 13.5, color: colors.text, fontWeight: '600' },
+  value: { fontSize: 13.5, color: colors.text, fontWeight: '600', fontVariant: ['tabular-nums'] },
   valueHi: { color: colors.success },
   grandRow: {
     flexDirection: 'row',
@@ -44,5 +44,5 @@ const styles = StyleSheet.create({
     borderTopColor: colors.border,
   },
   grandLabel: { fontSize: 15, fontWeight: '700', color: colors.text },
-  grandValue: { fontSize: 22, fontWeight: '800', color: colors.primary, letterSpacing: -0.5 },
+  grandValue: { fontSize: 22, color: colors.ink, ...font.price, letterSpacing: -0.6 },
 });

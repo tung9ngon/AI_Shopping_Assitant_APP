@@ -336,7 +336,9 @@ export default function LocationPickerScreen() {
     return (
       <Screen edges={[]}>
         <View style={styles.errorWrap}>
-          <Ionicons name="map-outline" size={44} color={colors.textMuted} />
+          <View style={styles.errorIcon}>
+            <Ionicons name="map-outline" size={30} color={colors.ink} />
+          </View>
           <Text style={styles.errorTitle}>Không mở được bản đồ</Text>
           <Text style={styles.errorDesc}>{mapError}</Text>
           <AppButton title="Quay lại nhập tay" onPress={() => navigation.goBack()} />
@@ -447,10 +449,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: colors.surface,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.borderStrong,
     ...shadow.float,
   },
   locateBtnPressed: { backgroundColor: colors.primarySoft },
 
+  // Thẻ nổi trên bản đồ thì giữ bóng đổ: nền bản đồ nhiều màu, viền tóc không đủ
+  // tách thẻ ra khỏi nó.
   card: {
     padding: spacing.lg,
     gap: spacing.xs,
@@ -459,10 +465,17 @@ const styles = StyleSheet.create({
     borderTopRightRadius: radius.xl,
     ...shadow.raised,
   },
-  cardLabel: { fontSize: 12, color: colors.textMuted, fontWeight: '600' },
+  cardLabel: {
+    fontSize: 10.5,
+    color: colors.textMuted,
+    fontWeight: '800',
+    letterSpacing: 0.9,
+    textTransform: 'uppercase',
+    marginBottom: 2,
+  },
   row: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingVertical: spacing.xs },
   searching: { fontSize: 14, color: colors.textSecondary },
-  main: { fontSize: 15.5, fontWeight: '700', color: colors.text },
+  main: { fontSize: 17, fontWeight: '800', color: colors.text, letterSpacing: -0.3 },
   secondary: { fontSize: 13, color: colors.textSecondary, lineHeight: 18 },
   note: { fontSize: 13.5, color: colors.textMuted, lineHeight: 19 },
   hint: { fontSize: 11.5, color: colors.textMuted, marginTop: spacing.xs },
@@ -475,6 +488,16 @@ const styles = StyleSheet.create({
     gap: spacing.md,
     padding: spacing.xl,
   },
-  errorTitle: { fontSize: 17, fontWeight: '700', color: colors.text },
+  errorIcon: {
+    width: 64,
+    height: 64,
+    borderRadius: radius.lg,
+    backgroundColor: colors.surfaceAlt,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  errorTitle: { fontSize: 18, fontWeight: '800', color: colors.text, letterSpacing: -0.4 },
   errorDesc: { fontSize: 13.5, color: colors.textMuted, textAlign: 'center', lineHeight: 19 },
 });
