@@ -10,8 +10,7 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
 import Screen from '../../components/Screen';
 import AppButton from '../../components/AppButton';
-import Gradient from '../../components/Gradient';
-import { colors, gradient, radius, shadow, spacing } from '../../theme';
+import { colors, font, radius, shadow, spacing, tagPalette } from '../../theme';
 import { formatVND } from '../../utils/format';
 import type { RootStackParamList } from '../../navigation/types';
 
@@ -26,9 +25,11 @@ export default function OrderSuccessScreen() {
   return (
     <Screen edges={[]}>
       <View style={styles.wrap}>
-        <Gradient colors={gradient.success} style={styles.iconCircle}>
-          <Ionicons name="checkmark" size={40} color={colors.textInverse} />
-        </Gradient>
+        {/* Vòng tròn nền xanh nhạt, phẳng, không quầng sáng — cùng lối với màn
+            Kết quả thanh toán để các màn kết quả trông là một bộ. */}
+        <View style={styles.iconCircle}>
+          <Ionicons name="checkmark" size={42} color={colors.success} />
+        </View>
 
         <Text style={styles.title}>{isPayos ? 'Thanh toán thành công' : 'Đã tạo đơn hàng'}</Text>
         <Text style={styles.desc}>
@@ -94,11 +95,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: spacing.lg,
-    shadowColor: '#389e0d',
-    shadowOpacity: 0.28,
-    shadowRadius: 16,
-    shadowOffset: { width: 0, height: 8 },
-    elevation: 5,
+    backgroundColor: tagPalette.green.bg,
   },
   title: { fontSize: 24, fontWeight: '800', color: colors.text, letterSpacing: -0.5 },
   desc: {
@@ -113,6 +110,8 @@ const styles = StyleSheet.create({
     alignSelf: 'stretch',
     backgroundColor: colors.surface,
     borderRadius: radius.xl,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.border,
     padding: spacing.lg,
     marginTop: spacing.xl,
     ...shadow.card,
@@ -120,7 +119,7 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', justifyContent: 'space-between', gap: spacing.lg, paddingVertical: 5 },
   rowLabel: { fontSize: 13.5, color: colors.textSecondary },
   rowValue: { fontSize: 13.5, color: colors.text, fontWeight: '600', flexShrink: 1, textAlign: 'right' },
-  rowValueStrong: { fontSize: 16, fontWeight: '800', color: colors.primary },
+  rowValueStrong: { fontSize: 17, color: colors.ink, ...font.price },
   rowValueMono: { fontVariant: ['tabular-nums'] },
 
   actions: { alignSelf: 'stretch', gap: spacing.sm, marginTop: spacing.xl },

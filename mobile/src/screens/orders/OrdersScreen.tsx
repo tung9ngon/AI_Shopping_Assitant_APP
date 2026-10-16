@@ -17,7 +17,7 @@ import Tag from '../../components/Tag';
 import Chip from '../../components/Chip';
 import { orderApi } from '../../api/orders';
 import { useApi } from '../../hooks/useApi';
-import { colors, radius, shadow, spacing } from '../../theme';
+import { colors, font, radius, shadow, spacing } from '../../theme';
 import { ORDER_STATUS_COLOR, ORDER_STATUS_LABEL, formatDate, formatVND } from '../../utils/format';
 import type { RootStackParamList } from '../../navigation/types';
 import { getItems } from '../../types';
@@ -117,30 +117,36 @@ const styles = StyleSheet.create({
   filterWrap: {
     backgroundColor: colors.surface,
     paddingVertical: spacing.md,
-    borderBottomLeftRadius: radius.xl,
-    borderBottomRightRadius: radius.xl,
-    ...shadow.card,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.borderStrong,
     zIndex: 2,
   },
   filterRow: { paddingHorizontal: spacing.lg, gap: spacing.sm },
 
   list: { padding: spacing.lg, gap: spacing.md },
-  card: { backgroundColor: colors.surface, borderRadius: radius.xl, padding: spacing.lg, ...shadow.card },
+  card: {
+    backgroundColor: colors.surface,
+    borderRadius: radius.xl,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.border,
+    padding: spacing.lg,
+    ...shadow.card,
+  },
   cardHead: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginBottom: spacing.md },
   // flex: 1 để tên sản phẩm dài xuống dòng thay vì đẩy tag trạng thái ra ngoài thẻ.
   headBody: { flex: 1, gap: 2 },
-  title: { fontSize: 14, fontWeight: '700', color: colors.text, lineHeight: 19 },
-  date: { fontSize: 11.5, color: colors.textMuted },
+  title: { fontSize: 14, fontWeight: '700', color: colors.text, lineHeight: 19, letterSpacing: -0.1 },
+  date: { fontSize: 11.5, color: colors.textMuted, fontVariant: ['tabular-nums'] },
   cardFoot: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     marginTop: spacing.md,
     paddingTop: spacing.md,
-    borderTopWidth: 1,
+    borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: colors.border,
   },
   totalLabel: { fontSize: 12.5, color: colors.textMuted },
   totalRight: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
-  total: { fontSize: 17, fontWeight: '800', color: colors.primary, letterSpacing: -0.3 },
+  total: { fontSize: 17, color: colors.ink, ...font.price },
 });

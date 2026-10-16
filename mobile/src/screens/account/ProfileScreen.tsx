@@ -20,7 +20,7 @@ import Gradient from '../../components/Gradient';
 import { useAuth } from '../../context/AuthContext';
 import { profileApi } from '../../api/profile';
 import { getErrorMessage } from '../../api/client';
-import { colors, gradient, spacing } from '../../theme';
+import { colors, gradient, radius, spacing } from '../../theme';
 import { PHONE_MESSAGE, PHONE_PATTERN } from '../../constants';
 import { avatarInitial, formatDateShort } from '../../utils/format';
 import type { RootStackParamList } from '../../navigation/types';
@@ -85,6 +85,7 @@ export default function ProfileScreen() {
         <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
           {/* ---- Thẻ tóm tắt, các trường chỉ đọc ---- */}
           <Card>
+            {/* Ô vuông bo góc màu mực — cùng dáng chữ đại diện ở màn Tài khoản. */}
             <View style={styles.summary}>
               <Gradient colors={gradient.brand} style={styles.avatar}>
                 <Text style={styles.avatarText}>{avatarInitial(user.full_name)}</Text>
@@ -162,14 +163,14 @@ const styles = StyleSheet.create({
 
   summary: { flexDirection: 'row', alignItems: 'center', gap: spacing.lg },
   avatar: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
+    width: 56,
+    height: 56,
+    borderRadius: radius.lg,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  avatarText: { fontSize: 24, fontWeight: '800', color: colors.textInverse },
-  name: { fontSize: 18, fontWeight: '700', color: colors.text, letterSpacing: -0.3 },
+  avatarText: { fontSize: 24, fontWeight: '900', color: colors.textInverse, letterSpacing: -0.5 },
+  name: { fontSize: 19, fontWeight: '800', color: colors.text, letterSpacing: -0.4 },
   tagRow: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.sm },
 
   metaRow: {
@@ -177,8 +178,8 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginTop: spacing.lg,
     paddingTop: spacing.md,
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.borderStrong,
   },
   metaLabel: { fontSize: 13, color: colors.textMuted },
   metaValue: { fontSize: 13, fontWeight: '600', color: colors.text },

@@ -263,7 +263,7 @@ const styles = StyleSheet.create({
 
 
   form: { gap: spacing.lg },
-  title: { fontSize: 24, fontWeight: '800', color: colors.text, letterSpacing: -0.5 },
+  title: { fontSize: 26, fontWeight: '800', color: colors.text, letterSpacing: -0.6 },
   desc: { fontSize: 14, color: colors.textSecondary, lineHeight: 20, marginTop: -spacing.sm },
   strong: { fontWeight: '700', color: colors.text },
 
@@ -272,7 +272,7 @@ const styles = StyleSheet.create({
   resendRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   resendText: { fontSize: 12.5, color: colors.textMuted },
   resendLink: { fontSize: 12.5, fontWeight: '700', color: colors.primary },
-  resendLinkOff: { color: colors.borderStrong },
+  resendLinkOff: { color: colors.textMuted, fontWeight: '600' },
 
   submit: { marginTop: spacing.xl },
 });

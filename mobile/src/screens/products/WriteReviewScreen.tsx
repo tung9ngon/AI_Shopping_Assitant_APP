@@ -22,7 +22,7 @@ import TextField from '../../components/TextField';
 import { useAuth } from '../../context/AuthContext';
 import { productApi } from '../../api/products';
 import { getErrorMessage } from '../../api/client';
-import { colors, radius, shadow, spacing, tagPalette } from '../../theme';
+import { colors, radius, shadow, spacing } from '../../theme';
 import type { RootStackParamList } from '../../navigation/types';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
@@ -79,7 +79,9 @@ export default function WriteReviewScreen() {
 
           {blocker ? (
             <View style={styles.blocker}>
-              <Ionicons name={blocker.icon} size={20} color={colors.warning} />
+              <View style={styles.blockerIcon}>
+                <Ionicons name={blocker.icon} size={19} color={colors.primary} />
+              </View>
               <View style={styles.flex}>
                 <Text style={styles.blockerText}>{blocker.text}</Text>
                 {blocker.action ? (
@@ -149,25 +151,37 @@ const styles = StyleSheet.create({
     padding: spacing.md,
     backgroundColor: colors.surface,
     borderRadius: radius.xl,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.border,
     ...shadow.card,
   },
-  productName: { flex: 1, fontSize: 14, fontWeight: '600', color: colors.text, lineHeight: 20 },
+  productName: { flex: 1, fontSize: 14.5, fontWeight: '700', color: colors.text, lineHeight: 20, letterSpacing: -0.2 },
 
+  // Chưa đăng nhập không phải lỗi — thẻ trắng viền đậm kèm ô biểu tượng, không tô
+  // nền vàng cảnh báo.
   blocker: {
     flexDirection: 'row',
     alignItems: 'flex-start',
     gap: spacing.md,
     padding: spacing.lg,
     borderRadius: radius.xl,
-    backgroundColor: tagPalette.gold.bg,
-    borderWidth: 1,
-    borderColor: '#ffe58f',
+    backgroundColor: colors.surface,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.borderStrong,
+  },
+  blockerIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: radius.md,
+    backgroundColor: colors.primarySoft,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   blockerText: { fontSize: 13.5, color: colors.textSecondary, lineHeight: 20 },
   blockerBtn: { marginTop: spacing.md, alignSelf: 'flex-start' },
 
   rateRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
-  rateValue: { fontSize: 15, fontWeight: '700', color: colors.text },
+  rateValue: { fontSize: 17, fontWeight: '800', color: colors.ink, fontVariant: ['tabular-nums'] },
 
   form: { gap: spacing.lg },
   contentInput: { minHeight: 96, textAlignVertical: 'top', paddingTop: spacing.sm },

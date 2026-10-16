@@ -27,10 +27,9 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import Screen from '../../components/Screen';
 import AppButton from '../../components/AppButton';
 import TextField from '../../components/TextField';
-import Gradient from '../../components/Gradient';
 import { useAuth } from '../../context/AuthContext';
 import { API_BASE_URL, getErrorMessage } from '../../api/client';
-import { colors, gradient, radius, spacing } from '../../theme';
+import { colors, radius, shadow, spacing } from '../../theme';
 import type { RootStackParamList } from '../../navigation/types';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
@@ -106,19 +105,23 @@ export default function LoginScreen() {
             hitSlop={8}
             style={styles.back}
           >
-            <Ionicons name="arrow-back" size={22} color={colors.text} />
+            <Ionicons name="arrow-back" size={20} color={colors.text} />
           </Pressable>
 
+          {/* Cùng dấu nhận diện với đầu trang chủ: monogram N trên ô xanh ngọc + chữ
+              NexTech — vào đăng nhập vẫn thấy đúng là một cửa hàng. */}
           <View style={styles.logoRow}>
-            <Gradient colors={gradient.brand} style={styles.logoMark}>
-              <Ionicons name="flash" size={20} color={colors.textInverse} />
-            </Gradient>
+            <View style={styles.logoMark}>
+              <Text style={styles.logoLetter}>N</Text>
+            </View>
             <Text style={styles.brand}>NexTech</Text>
           </View>
 
           <Text style={styles.title}>Đăng nhập</Text>
           <Text style={styles.subtitle}>Mua hàng, theo dõi đơn và giữ lại các phiên tư vấn AI.</Text>
 
+          {/* Form nằm trên một tấm thẻ trắng: tách khỏi nền giấy, mắt biết ngay đâu là
+              phần phải điền. */}
           <View style={styles.form}>
             <TextField
               label="Email"
@@ -139,28 +142,30 @@ export default function LoginScreen() {
               secureTextEntry={secure}
               autoCapitalize="none"
             />
-            <Pressable
-              accessibilityRole="button"
-              onPress={() => setSecure((s) => !s)}
-              hitSlop={6}
-              style={styles.toggleRow}
-            >
-              <Ionicons
-                name={secure ? 'eye-outline' : 'eye-off-outline'}
-                size={15}
-                color={colors.textMuted}
-              />
-              <Text style={styles.toggleText}>{secure ? 'Hiện mật khẩu' : 'Ẩn mật khẩu'}</Text>
-            </Pressable>
+            {/* Hai thao tác phụ của ô mật khẩu chung một hàng, ngay dưới ô đó. */}
+            <View style={styles.passwordActions}>
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => setSecure((s) => !s)}
+                hitSlop={6}
+                style={styles.toggleRow}
+              >
+                <Ionicons
+                  name={secure ? 'eye-outline' : 'eye-off-outline'}
+                  size={15}
+                  color={colors.textMuted}
+                />
+                <Text style={styles.toggleText}>{secure ? 'Hiện mật khẩu' : 'Ẩn mật khẩu'}</Text>
+              </Pressable>
 
-            <Pressable
-              accessibilityRole="button"
-              onPress={() => navigation.navigate('ForgotPassword')}
-              hitSlop={6}
-              style={styles.forgotRow}
-            >
-              <Text style={styles.forgot}>Quên mật khẩu?</Text>
-            </Pressable>
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => navigation.navigate('ForgotPassword')}
+                hitSlop={6}
+              >
+                <Text style={styles.forgot}>Quên mật khẩu?</Text>
+              </Pressable>
+            </View>
 
             {/* Lỗi hiện chung dưới form: "sai mật khẩu" hay "thiếu mật khẩu" mà gắn
                 vào riêng ô Email là báo sai chỗ. */}
@@ -227,32 +232,60 @@ function SocialButton({
 
 const styles = StyleSheet.create({
   flex: { flex: 1 },
-  scroll: { padding: spacing.xl, paddingTop: spacing.lg },
-  back: { alignSelf: 'flex-start', padding: 4, marginBottom: spacing.xl },
-
-  logoRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.xxl },
-  logoMark: {
+  scroll: { padding: spacing.xl, paddingTop: spacing.md },
+  // Nút tròn viền tóc: đủ thấy là nút bấm mà không nặng như một mảng màu.
+  back: {
+    alignSelf: 'flex-start',
     width: 40,
     height: 40,
-    borderRadius: radius.lg,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.surface,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.borderStrong,
+    marginBottom: spacing.xl,
+  },
+
+  logoRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.xl },
+  logoMark: {
+    width: 34,
+    height: 34,
+    borderRadius: radius.md - 1,
+    backgroundColor: colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  brand: { fontSize: 21, fontWeight: '800', color: colors.text, letterSpacing: -0.3 },
+  logoLetter: { fontSize: 19, fontWeight: '900', color: colors.textInverse, letterSpacing: -0.5 },
+  brand: { fontSize: 20, fontWeight: '800', color: colors.text, letterSpacing: -0.4 },
 
-  title: { fontSize: 28, fontWeight: '800', color: colors.text, letterSpacing: -0.6 },
-  subtitle: { fontSize: 14, color: colors.textMuted, marginTop: spacing.sm, lineHeight: 20 },
+  title: { fontSize: 30, fontWeight: '800', color: colors.text, letterSpacing: -0.8 },
+  subtitle: { fontSize: 14.5, color: colors.textSecondary, marginTop: spacing.sm, lineHeight: 21 },
 
-  form: { gap: spacing.lg, marginTop: spacing.xxl },
+  form: {
+    gap: spacing.lg,
+    marginTop: spacing.xl,
+    padding: spacing.lg,
+    backgroundColor: colors.surface,
+    borderRadius: radius.xl,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.border,
+    ...shadow.card,
+  },
+  passwordActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: -spacing.xs,
+  },
   toggleRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
   toggleText: { fontSize: 12.5, color: colors.textMuted },
-  forgotRow: { alignSelf: 'flex-end' },
-  forgot: { fontSize: 12.5, fontWeight: '600', color: colors.primary },
+  forgot: { fontSize: 12.5, fontWeight: '700', color: colors.primary },
   error: { fontSize: 12.5, color: colors.danger },
-  submit: { marginTop: spacing.sm },
+  submit: { marginTop: spacing.xs },
 
-  dividerRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginVertical: spacing.xxl },
-  line: { flex: 1, height: 1, backgroundColor: colors.border },
+  dividerRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginVertical: spacing.xl },
+  line: { flex: 1, height: StyleSheet.hairlineWidth, backgroundColor: colors.borderStrong },
   dividerText: { fontSize: 12, color: colors.textMuted },
 
   socialRow: { flexDirection: 'row', gap: spacing.md },
@@ -268,8 +301,8 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     backgroundColor: colors.surface,
   },
-  socialPressed: { opacity: 0.7 },
-  socialText: { fontSize: 14, fontWeight: '600', color: colors.text },
+  socialPressed: { backgroundColor: colors.surfaceAlt, borderColor: colors.borderStrong },
+  socialText: { fontSize: 14, fontWeight: '700', color: colors.text },
 
   footerRow: {
     flexDirection: 'row',

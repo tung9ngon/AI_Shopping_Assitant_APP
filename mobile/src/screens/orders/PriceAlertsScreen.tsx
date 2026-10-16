@@ -13,11 +13,10 @@ import Screen from '../../components/Screen';
 import EmptyState from '../../components/EmptyState';
 import LoadState from '../../components/LoadState';
 import ProductThumb from '../../components/ProductThumb';
-import Tag from '../../components/Tag';
 import { priceAlertApi } from '../../api/priceAlerts';
 import { getErrorMessage } from '../../api/client';
 import { useApi } from '../../hooks/useApi';
-import { colors, radius, shadow, spacing } from '../../theme';
+import { colors, font, radius, shadow, spacing } from '../../theme';
 import { formatVND } from '../../utils/format';
 import type { RootStackParamList } from '../../navigation/types';
 
@@ -108,11 +107,18 @@ export default function PriceAlertsScreen() {
                 <View style={styles.priceRow}>
                   <Text style={styles.current}>{formatVND(current)}</Text>
                   <Ionicons name="arrow-forward" size={12} color={colors.textMuted} />
-                  <Text style={styles.target}>{formatVND(item.target_price)}</Text>
+                  <Text style={[styles.target, reached && styles.targetReached]}>
+                    {formatVND(item.target_price)}
+                  </Text>
                 </View>
 
+                {/* Giá đã giảm tới mức mục tiêu là tin ưu đãi — dùng đỏ gạch như mọi
+                    nhãn giảm giá khác, không dùng xanh "thành công". */}
                 {reached ? (
-                  <Tag label="Đã chạm giá mục tiêu" color="green" />
+                  <View style={styles.reachedBadge}>
+                    <Ionicons name="trending-down-outline" size={13} color={colors.accent} />
+                    <Text style={styles.reachedText}>Đã chạm giá mục tiêu</Text>
+                  </View>
                 ) : (
                   <Text style={styles.gap}>Còn cách {formatVND(gap)}</Text>
                 )}
@@ -158,12 +164,31 @@ const styles = StyleSheet.create({
     padding: spacing.md,
     backgroundColor: colors.surface,
     borderRadius: radius.xl,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.border,
     ...shadow.card,
   },
   body: { flex: 1, gap: spacing.xs },
   name: { fontSize: 13.5, color: colors.text, lineHeight: 19 },
   priceRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  current: { fontSize: 13, color: colors.textMuted, textDecorationLine: 'line-through' },
-  target: { fontSize: 14, fontWeight: '700', color: colors.primary },
-  gap: { fontSize: 12, color: colors.textMuted },
+  current: {
+    fontSize: 13,
+    color: colors.textMuted,
+    textDecorationLine: 'line-through',
+    fontVariant: ['tabular-nums'],
+  },
+  target: { fontSize: 15, color: colors.ink, ...font.price },
+  targetReached: { color: colors.accent },
+  reachedBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    alignSelf: 'flex-start',
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 3,
+    borderRadius: radius.sm,
+    backgroundColor: colors.accentSoft,
+  },
+  reachedText: { fontSize: 12, fontWeight: '700', color: colors.accent },
+  gap: { fontSize: 12, color: colors.textMuted, fontVariant: ['tabular-nums'] },
 });

@@ -6,7 +6,7 @@ import { memo, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import Ionicons from '@react-native-vector-icons/ionicons/static';
 import ProductThumb from './ProductThumb';
-import { colors, radius, shadow, spacing } from '../theme';
+import { colors, font, radius, shadow, spacing } from '../theme';
 import { formatVND } from '../utils/format';
 import type { ProductListItem } from '../api/products';
 
@@ -87,7 +87,7 @@ function ProductCard({
               bỏ hẳn huy hiệu — không chiếm chỗ cho dòng "Chưa có đánh giá". */}
           {score > 0 ? (
             <View style={styles.score}>
-              <Ionicons name="star" size={10} color={colors.warning} />
+              <Ionicons name="star" size={10} color={colors.star} />
               <Text style={styles.scoreText}>{score.toFixed(1)}</Text>
             </View>
           ) : null}
@@ -152,6 +152,8 @@ const styles = StyleSheet.create({
   inner: {
     backgroundColor: colors.surface,
     borderRadius: radius.xl,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.border,
     overflow: 'hidden',
   },
   pressed: { opacity: 0.92, transform: [{ scale: 0.98 }] },
@@ -165,17 +167,17 @@ const styles = StyleSheet.create({
     top: spacing.sm,
     left: spacing.sm,
     maxWidth: '70%',
-    paddingHorizontal: spacing.sm,
+    paddingHorizontal: 7,
     paddingVertical: 3,
-    borderRadius: radius.sm,
-    backgroundColor: colors.primary,
+    borderRadius: 5,
+    backgroundColor: colors.ink,
   },
   tagText: {
-    fontSize: 10,
-    fontWeight: '700',
+    fontSize: 9.5,
+    fontWeight: '800',
     color: colors.textInverse,
     textTransform: 'uppercase',
-    letterSpacing: 0.4,
+    letterSpacing: 0.6,
   },
 
   score: {
@@ -194,36 +196,33 @@ const styles = StyleSheet.create({
   },
   scoreText: { fontSize: 11, fontWeight: '700', color: colors.text },
 
-  body: { padding: spacing.md, gap: 3 },
+  body: { paddingHorizontal: spacing.md, paddingTop: spacing.md, paddingBottom: spacing.md, gap: 4 },
   brand: {
     fontSize: 10,
     fontWeight: '700',
-    color: colors.textMuted,
-    letterSpacing: 0.6,
+    color: colors.primary,
+    letterSpacing: 0.8,
     textTransform: 'uppercase',
   },
-  name: { fontSize: 13, color: colors.text, lineHeight: 18, minHeight: 36 },
+  name: { fontSize: 13.5, fontWeight: '500', color: colors.text, lineHeight: 18, minHeight: 36 },
   priceRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
     marginTop: 2,
   },
-  price: { flex: 1, fontSize: 16, fontWeight: '800', color: colors.primary, letterSpacing: -0.2 },
+  price: { flex: 1, fontSize: 16, color: colors.ink, ...font.price },
+  // Ô vuông bo màu mực thay vì chấm tròn màu thương hiệu: đọc như một nút công cụ,
+  // không tranh chỗ với giá.
   addBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: colors.primary,
+    width: 34,
+    height: 34,
+    borderRadius: radius.md,
+    backgroundColor: colors.ink,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: colors.primaryDark,
-    shadowOpacity: 0.28,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 3 },
-    elevation: 3,
   },
-  addBtnDone: { backgroundColor: colors.success, shadowColor: colors.success },
+  addBtnDone: { backgroundColor: colors.primary },
   addBtnPressed: { opacity: 0.85, transform: [{ scale: 0.94 }] },
 });
 

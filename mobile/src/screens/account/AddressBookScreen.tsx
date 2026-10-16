@@ -84,7 +84,9 @@ export default function AddressBookScreen() {
         renderItem={({ item }) => (
           <View style={styles.card}>
             <View style={styles.head}>
-              <Ionicons name="location-outline" size={18} color={colors.primary} />
+              <View style={styles.headIcon}>
+                <Ionicons name="location-outline" size={17} color={colors.primary} />
+              </View>
               <Text style={styles.name} numberOfLines={1}>
                 {item.recipient_name || 'Người nhận'}
               </Text>
@@ -110,7 +112,7 @@ export default function AddressBookScreen() {
                 <Ionicons
                   name={item.is_default ? 'star' : 'star-outline'}
                   size={15}
-                  color={item.is_default ? colors.warning : colors.textSecondary}
+                  color={item.is_default ? colors.star : colors.textSecondary}
                 />
                 <Text style={[styles.actionText, item.is_default && styles.actionTextOff]}>
                   {item.is_default ? 'Đang mặc định' : 'Đặt mặc định'}
@@ -165,12 +167,23 @@ const styles = StyleSheet.create({
     gap: spacing.xs,
     backgroundColor: colors.surface,
     borderRadius: radius.xl,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.border,
     ...shadow.card,
   },
-  head: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  name: { fontSize: 14.5, fontWeight: '700', color: colors.text, flexShrink: 1 },
-  phone: { fontSize: 13, color: colors.textSecondary, lineHeight: 19 },
-  address: { fontSize: 13, color: colors.textSecondary, lineHeight: 19 },
+  head: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.xs },
+  headIcon: {
+    width: 30,
+    height: 30,
+    borderRadius: radius.md - 2,
+    backgroundColor: colors.primarySoft,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  name: { fontSize: 15.5, fontWeight: '800', color: colors.text, flexShrink: 1, letterSpacing: -0.2 },
+  // Thẳng cột với tên người nhận (thụt bằng ô biểu tượng 30 + khoảng cách).
+  phone: { fontSize: 13, color: colors.text, fontWeight: '600', lineHeight: 19, marginLeft: 30 + spacing.sm },
+  address: { fontSize: 13, color: colors.textSecondary, lineHeight: 19, marginLeft: 30 + spacing.sm },
 
   actions: {
     flexDirection: 'row',
@@ -178,7 +191,7 @@ const styles = StyleSheet.create({
     gap: spacing.lg,
     marginTop: spacing.md,
     paddingTop: spacing.md,
-    borderTopWidth: 1,
+    borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: colors.border,
   },
   action: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
@@ -186,11 +199,11 @@ const styles = StyleSheet.create({
   actionTextOff: { color: colors.textMuted },
   actionDanger: { color: colors.danger },
 
+  // Thanh đáy phẳng, ngăn bằng viền tóc thay vì bóng đổ ngược lên.
   footer: {
     padding: spacing.lg,
     backgroundColor: colors.surface,
-    borderTopLeftRadius: radius.xl,
-    borderTopRightRadius: radius.xl,
-    ...shadow.raised,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.borderStrong,
   },
 });

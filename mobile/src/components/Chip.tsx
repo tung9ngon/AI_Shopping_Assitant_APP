@@ -1,9 +1,8 @@
-// Chip lọc dạng viên thuốc — đang chọn thì tô gradient cam đặc chứ không phải nền
-// cam nhạt: hàng chip cuộn ngang, liếc qua phải thấy ngay đang đứng ở mục nào.
+// Chip lọc dạng viên thuốc — đang chọn thì tô đặc màu mực chứ không phải nền nhạt:
+// hàng chip cuộn ngang, liếc qua phải thấy ngay đang đứng ở mục nào.
 // Dùng chung cho hàng danh mục ở màn Sản phẩm và hàng trạng thái ở màn Đơn hàng.
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import Gradient from './Gradient';
-import { colors, gradient, radius, spacing } from '../theme';
+import { colors, radius, spacing } from '../theme';
 
 export default function Chip({
   label,
@@ -25,14 +24,7 @@ export default function Chip({
       onPress={onPress}
       style={({ pressed }) => [styles.wrap, pressed && styles.pressed]}
     >
-      {active ? (
-        // Nền chuyển sắc nên không có viền: viền đi kèm sẽ cắt ngang dải màu.
-        <Gradient colors={gradient.brand} style={styles.pill}>
-          {content}
-        </Gradient>
-      ) : (
-        <View style={[styles.pill, styles.idle]}>{content}</View>
-      )}
+      <View style={[styles.pill, active ? styles.active : styles.idle]}>{content}</View>
     </Pressable>
   );
 }
@@ -45,12 +37,18 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     borderRadius: radius.pill,
   },
+  // Cùng độ dày viền ở cả hai trạng thái để chip không xê dịch khi chọn.
   idle: {
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.border,
   },
+  active: {
+    backgroundColor: colors.ink,
+    borderWidth: 1,
+    borderColor: colors.ink,
+  },
   pressed: { opacity: 0.8 },
-  text: { fontSize: 13, color: colors.textSecondary, fontWeight: '600' },
+  text: { fontSize: 13, color: colors.text, fontWeight: '600' },
   textActive: { color: colors.textInverse },
 });

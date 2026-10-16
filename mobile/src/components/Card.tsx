@@ -24,10 +24,12 @@ const styles = StyleSheet.create({
   card: {
     backgroundColor: colors.surface,
     borderRadius: radius.xl,
-    // Không viền: thẻ luôn nằm trên nền xám, chỉ riêng đổ bóng đã đủ tách khỏi nền,
-    // thêm viền thành hai đường ranh giới chồng nhau.
+    // Viền tóc + bóng rất nhẹ: trên nền giấy ấm, chỉ có bóng thì mép thẻ nhoè;
+    // viền mảnh giữ mép sắc như giấy cắt.
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.border,
     ...shadow.card,
   },
   padded: { padding: spacing.lg },
-  title: { fontSize: 15, fontWeight: '700', color: colors.text, marginBottom: spacing.md, letterSpacing: -0.2 },
+  title: { fontSize: 16, fontWeight: '800', color: colors.text, marginBottom: spacing.md, letterSpacing: -0.3 },
 });

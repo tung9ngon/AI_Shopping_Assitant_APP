@@ -139,7 +139,9 @@ function PreferencesForm({
       <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
           <View style={styles.banner}>
-            <Ionicons name="sparkles" size={16} color={colors.primary} />
+            <View style={styles.bannerIcon}>
+              <Ionicons name="bulb-outline" size={17} color={colors.primary} />
+            </View>
             <Text style={styles.bannerText}>
               Những thông tin này giúp trợ lý AI gợi ý sản phẩm hợp với bạn hơn.
             </Text>
@@ -299,7 +301,7 @@ function Chip({
       style={[styles.chip, selected && styles.chipOn]}
     >
       <Text style={[styles.chipText, selected && styles.chipTextOn]}>{label}</Text>
-      {removable ? <Ionicons name="close" size={13} color={colors.primary} /> : null}
+      {removable ? <Ionicons name="close" size={13} color={colors.textInverse} /> : null}
     </Pressable>
   );
 }
@@ -311,12 +313,22 @@ const styles = StyleSheet.create({
   banner: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.sm,
+    gap: spacing.md,
     padding: spacing.md,
     borderRadius: radius.lg,
-    backgroundColor: colors.primarySoft,
+    backgroundColor: colors.surface,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.border,
   },
-  bannerText: { flex: 1, fontSize: 12.5, color: colors.textSecondary, lineHeight: 18 },
+  bannerIcon: {
+    width: 34,
+    height: 34,
+    borderRadius: radius.md,
+    backgroundColor: colors.primarySoft,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  bannerText: { flex: 1, fontSize: 13, color: colors.textSecondary, lineHeight: 19 },
 
   section: { gap: spacing.lg },
   field: { gap: spacing.sm },
@@ -328,6 +340,8 @@ const styles = StyleSheet.create({
   dash: { fontSize: 14, color: colors.textMuted },
 
   chipWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+  // Đang chọn thì tô đặc màu mực — cùng cách với components/Chip, để cả app chỉ có
+  // một kiểu "đã chọn". Cùng độ dày viền ở hai trạng thái để chip không xê dịch.
   chip: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -337,11 +351,11 @@ const styles = StyleSheet.create({
     borderRadius: radius.pill,
     borderWidth: 1,
     borderColor: colors.border,
-    backgroundColor: colors.surfaceAlt,
+    backgroundColor: colors.surface,
   },
-  chipOn: { borderColor: colors.primary, backgroundColor: colors.primarySoft },
-  chipText: { fontSize: 13, fontWeight: '600', color: colors.textSecondary },
-  chipTextOn: { color: colors.primary },
+  chipOn: { borderColor: colors.ink, backgroundColor: colors.ink },
+  chipText: { fontSize: 13, fontWeight: '600', color: colors.text },
+  chipTextOn: { color: colors.textInverse },
 
   summary: { fontSize: 13.5, color: colors.textSecondary, lineHeight: 20 },
 });

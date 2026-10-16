@@ -1,9 +1,9 @@
 // Ảnh sản phẩm.
 //
 // Backend lưu ảnh trên Cloudinary. Sản phẩm chưa có ảnh (hoặc endpoint không trả ảnh)
-// thì vẽ ảnh thay thế mang nhận diện cửa hàng: nền pha màu theo danh mục kèm biểu tượng
-// tương ứng — truyền `icon` là trường `icon` của danh mục (emoji hoặc URL, xem
-// CategoryIcon), không có thì rơi về glyph chung.
+// thì vẽ ảnh thay thế trung tính: nền giấy nhạt kèm glyph theo tên danh mục (xem
+// CategoryIcon) — không pha màu theo danh mục nữa, vài ô cầu vồng giữa lưới ảnh thật
+// trông như hàng mẫu.
 import {
   Image,
   StyleSheet,
@@ -15,32 +15,16 @@ import {
 import CategoryIcon from './CategoryIcon';
 import { colors, radius } from '../theme';
 
-const CATEGORY_TINT: Record<string, string> = {
-  'laptop-outline': '#eef4ff',
-  'phone-portrait-outline': '#fff3ec',
-  'watch-outline': '#f0fff4',
-  'headset-outline': '#f9f0ff',
-  'tablet-landscape-outline': '#e6fffb',
-  'hardware-chip-outline': '#fffbe6',
-};
-
-const CATEGORY_FG: Record<string, string> = {
-  'laptop-outline': '#4f7cff',
-  'phone-portrait-outline': colors.primary,
-  'watch-outline': '#3aa76d',
-  'headset-outline': '#8a4fdb',
-  'tablet-landscape-outline': '#0f9b93',
-  'hardware-chip-outline': '#d99106',
-};
-
 export default function ProductThumb({
   uri,
   icon,
+  categoryName,
   size,
   style,
 }: {
   uri?: string | null;
   icon?: string | null;
+  categoryName?: string | null;
   size: number;
   // Áp cho cả nhánh Image lẫn nhánh placeholder (View) — giao của hai kiểu style.
   style?: StyleProp<ImageStyle & ViewStyle>;
@@ -48,23 +32,16 @@ export default function ProductThumb({
   const box = { width: size, height: size, borderRadius: radius.lg };
 
   if (uri) {
-    return <Image source={{ uri }} style={[box, style]} resizeMode="cover" />;
+    return <Image source={{ uri }} style={[box, styles.image, style]} resizeMode="cover" />;
   }
 
-  const key = icon ?? 'hardware-chip-outline';
   return (
-    <View
-      style={[
-        box,
-        styles.placeholder,
-        { backgroundColor: CATEGORY_TINT[key] ?? colors.surfaceAlt },
-        style,
-      ]}
-    >
+    <View style={[box, styles.placeholder, style]}>
       <CategoryIcon
+        name={categoryName}
         icon={icon}
-        size={size * 0.42}
-        color={CATEGORY_FG[key] ?? colors.textMuted}
+        size={size * 0.38}
+        color={colors.borderStrong}
         fallback="hardware-chip-outline"
       />
     </View>
@@ -72,5 +49,12 @@ export default function ProductThumb({
 }
 
 const styles = StyleSheet.create({
-  placeholder: { alignItems: 'center', justifyContent: 'center' },
+  // Ảnh sản phẩm thường nền trắng — nền giấy nhạt phía sau giữ được mép ảnh khi
+  // ảnh chưa tải xong hoặc có viền trong suốt.
+  image: { backgroundColor: colors.surfaceAlt },
+  placeholder: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.surfaceAlt,
+  },
 });

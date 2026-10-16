@@ -29,7 +29,7 @@ import { type DiscountCodeItem } from '../../api/discounts';
 import { orderApi } from '../../api/orders';
 import { paymentApi } from '../../api/payments';
 import { getErrorMessage } from '../../api/client';
-import { colors, radius, shadow, spacing } from '../../theme';
+import { colors, font, radius, shadow, spacing } from '../../theme';
 import { formatVND } from '../../utils/format';
 import { baseShippingFee, computeDiscount } from '../../utils/discount';
 import type { RootStackParamList } from '../../navigation/types';
@@ -167,7 +167,9 @@ export default function CheckoutScreen() {
           onPress={() => (address ? setAddressOpen(true) : navigation.navigate('AddressForm', {}))}
           style={styles.addressCard}
         >
-          <Ionicons name="location-outline" size={20} color={colors.primary} />
+          <View style={styles.iconTile}>
+            <Ionicons name="location-outline" size={19} color={colors.primary} />
+          </View>
           <View style={styles.flex}>
             {address ? (
               <>
@@ -216,7 +218,9 @@ export default function CheckoutScreen() {
           }
           style={styles.voucherRow}
         >
-          <Ionicons name="pricetags-outline" size={20} color={colors.primary} />
+          <View style={styles.iconTile}>
+            <Ionicons name="pricetags-outline" size={19} color={colors.primary} />
+          </View>
           <Text style={styles.voucherLabel}>Mã giảm giá</Text>
           <Text style={styles.voucherValue}>
             {voucherCount > 0 ? `Đã chọn ${voucherCount} mã` : 'Chọn mã'}
@@ -236,7 +240,7 @@ export default function CheckoutScreen() {
                 onPress={() => setMethod(opt.method)}
                 style={[styles.payOption, active && styles.payOptionActive]}
               >
-                <Ionicons name={opt.icon} size={22} color={active ? colors.primary : colors.textMuted} />
+                <Ionicons name={opt.icon} size={22} color={active ? colors.ink : colors.textMuted} />
                 <View style={styles.flex}>
                   <Text style={[styles.payTitle, active && styles.payTitleActive]}>{opt.title}</Text>
                   <Text style={styles.payDesc}>{opt.desc}</Text>
@@ -353,18 +357,33 @@ export default function CheckoutScreen() {
   );
 }
 
+// Thẻ lựa chọn: viền tóc khi chưa chọn, viền 1.5 khi chọn. Phần viền dày thêm được
+// trừ vào padding để nội dung không nhích đi khi bấm chọn.
+const SELECTED_BORDER = 1.5;
+const OPTION_PAD = spacing.md + SELECTED_BORDER - StyleSheet.hairlineWidth;
+
 const styles = StyleSheet.create({
   flex: { flex: 1 },
   scroll: { padding: spacing.lg, paddingBottom: 120, gap: spacing.md },
 
   addressCard: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     gap: spacing.md,
     padding: spacing.lg,
     backgroundColor: colors.surface,
     borderRadius: radius.xl,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.border,
     ...shadow.card,
+  },
+  iconTile: {
+    width: 36,
+    height: 36,
+    borderRadius: radius.md,
+    backgroundColor: colors.primarySoft,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   addressHeadRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   addressName: { fontSize: 14, fontWeight: '700', color: colors.text },
@@ -379,10 +398,10 @@ const styles = StyleSheet.create({
 
   card: { marginTop: 0 },
   itemRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingVertical: spacing.md },
-  itemRowBorder: { borderTopWidth: 1, borderTopColor: colors.border },
+  itemRowBorder: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border },
   itemName: { fontSize: 13, color: colors.text, lineHeight: 18 },
   itemQty: { fontSize: 12, color: colors.textMuted, marginTop: 2 },
-  itemPrice: { fontSize: 13.5, fontWeight: '700', color: colors.text },
+  itemPrice: { fontSize: 14, color: colors.ink, ...font.price },
 
   voucherRow: {
     flexDirection: 'row',
@@ -391,6 +410,8 @@ const styles = StyleSheet.create({
     padding: spacing.lg,
     backgroundColor: colors.surface,
     borderRadius: radius.xl,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.border,
     ...shadow.card,
   },
   voucherLabel: { flex: 1, fontSize: 14, fontWeight: '600', color: colors.text },
@@ -400,16 +421,18 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.md,
-    padding: spacing.md,
+    padding: OPTION_PAD,
     borderRadius: radius.lg,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surfaceAlt,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.borderStrong,
+    backgroundColor: colors.surface,
     marginBottom: spacing.sm,
   },
-  payOptionActive: { borderColor: colors.primary, backgroundColor: colors.primarySoft },
+  // Lựa chọn đang chọn: viền mực đậm trên nền trắng, chấm radio xanh ngọc —
+  // không tô cả thẻ bằng màu thương hiệu.
+  payOptionActive: { borderWidth: SELECTED_BORDER, borderColor: colors.ink, padding: spacing.md },
   payTitle: { fontSize: 13.5, fontWeight: '600', color: colors.text },
-  payTitleActive: { color: colors.primary },
+  payTitleActive: { fontWeight: '700', color: colors.ink },
   payDesc: { fontSize: 11.5, color: colors.textMuted, lineHeight: 16, marginTop: 2 },
 
 
@@ -424,15 +447,14 @@ const styles = StyleSheet.create({
     padding: spacing.lg,
     paddingBottom: spacing.xl,
     backgroundColor: colors.surface,
-    borderTopLeftRadius: radius.xl,
-    borderTopRightRadius: radius.xl,
-    ...shadow.raised,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.borderStrong,
   },
   footerLabel: { fontSize: 12, color: colors.textMuted },
-  footerTotal: { fontSize: 19, fontWeight: '800', color: colors.primary },
+  footerTotal: { fontSize: 20, color: colors.ink, ...font.price },
   placeBtn: { minWidth: 150 },
 
-  backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.35)' },
+  backdrop: { flex: 1, backgroundColor: 'rgba(16,18,17,0.45)' },
   sheet: {
     backgroundColor: colors.surface,
     borderTopLeftRadius: radius.xl,
@@ -449,18 +471,19 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
     marginBottom: spacing.lg,
   },
-  sheetTitle: { fontSize: 18, fontWeight: '700', color: colors.text, marginBottom: spacing.md },
+  sheetTitle: { fontSize: 18, fontWeight: '800', letterSpacing: -0.4, color: colors.text, marginBottom: spacing.md },
   addressOption: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.md,
-    padding: spacing.md,
+    padding: OPTION_PAD,
     borderRadius: radius.lg,
-    borderWidth: 1,
-    borderColor: colors.border,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.borderStrong,
+    backgroundColor: colors.surface,
     marginBottom: spacing.sm,
   },
-  addressOptionActive: { borderColor: colors.primary, backgroundColor: colors.primarySoft },
+  addressOptionActive: { borderWidth: SELECTED_BORDER, borderColor: colors.ink, padding: spacing.md },
   addAddressRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -470,9 +493,9 @@ const styles = StyleSheet.create({
     borderRadius: radius.lg,
     borderWidth: 1,
     borderStyle: 'dashed',
-    borderColor: colors.primary,
+    borderColor: colors.borderStrong,
     marginTop: spacing.xs,
   },
-  addAddressRowPressed: { backgroundColor: colors.primarySoft },
+  addAddressRowPressed: { backgroundColor: colors.surfaceAlt },
   addAddressText: { fontSize: 14, fontWeight: '700', color: colors.primary },
 });

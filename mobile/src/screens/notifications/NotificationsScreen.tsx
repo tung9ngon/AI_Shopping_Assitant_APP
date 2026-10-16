@@ -16,7 +16,7 @@ import { notificationApi, type NotificationItem, type NotificationType } from '.
 import { getErrorMessage } from '../../api/client';
 import { useApi } from '../../hooks/useApi';
 import { useAuth } from '../../context/AuthContext';
-import { colors, radius, shadow, spacing } from '../../theme';
+import { colors, radius, shadow, spacing, tagPalette } from '../../theme';
 import { formatDate } from '../../utils/format';
 import { getItems } from '../../types';
 import type { RootStackParamList } from '../../navigation/types';
@@ -26,12 +26,14 @@ type Nav = NativeStackNavigationProp<RootStackParamList>;
 const PAGE_LIMIT = 30;
 
 // Mỗi loại một biểu tượng + sắc riêng, để lướt danh sách là phân biệt được ngay.
+// Sắc lấy từ token: giá giảm dùng đỏ gạch của ưu đãi, gợi ý dùng xanh ngọc thương
+// hiệu, đơn hàng/ khuyến mãi mượn cặp nền-chữ đã hạ bão hoà của tagPalette.
 const TYPE_VIEW: Record<NotificationType, { icon: IoniconsIconName; bg: string; fg: string }> = {
-  price_alert: { icon: 'pricetag-outline', bg: '#fff1e7', fg: '#e35410' },
-  deal: { icon: 'flame-outline', bg: '#fff1f0', fg: '#cf1322' },
-  recommendation: { icon: 'sparkles-outline', bg: '#f6efff', fg: '#7c46cf' },
-  order_update: { icon: 'cube-outline', bg: '#e6f4ff', fg: '#0958d9' },
-  system: { icon: 'information-circle-outline', bg: '#fafafa', fg: '#595959' },
+  price_alert: { icon: 'pricetag-outline', bg: colors.accentSoft, fg: colors.accent },
+  deal: { icon: 'flame-outline', bg: tagPalette.gold.bg, fg: tagPalette.gold.fg },
+  recommendation: { icon: 'thumbs-up-outline', bg: colors.primarySoft, fg: colors.primary },
+  order_update: { icon: 'cube-outline', bg: tagPalette.blue.bg, fg: tagPalette.blue.fg },
+  system: { icon: 'information-circle-outline', bg: colors.surfaceAlt, fg: colors.textSecondary },
 };
 
 export default function NotificationsScreen() {
@@ -191,16 +193,18 @@ const styles = StyleSheet.create({
     padding: spacing.md,
     backgroundColor: colors.surface,
     borderRadius: radius.xl,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.border,
     ...shadow.card,
   },
-  // Chưa đọc: viền trái đậm màu thương hiệu — thấy được cả khi lướt nhanh, mà không
-  // phải đổi hẳn màu nền thẻ.
-  cardUnread: { borderLeftWidth: 3, borderLeftColor: colors.primary },
+  // Chưa đọc: chấm đỏ gạch + tiêu đề đậm, viền thẻ đậm hơn một nấc. Không dùng vạch
+  // màu ở mép trái — vạch dày trên thẻ bo góc lớn bị uốn cong theo góc, trông lệch.
+  cardUnread: { borderColor: colors.borderStrong },
   cardPressed: { backgroundColor: colors.surfaceAlt },
   icon: {
     width: 40,
     height: 40,
-    borderRadius: radius.pill,
+    borderRadius: radius.md,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -213,7 +217,7 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: colors.primary,
+    backgroundColor: colors.accent,
     marginTop: spacing.sm,
   },
 });

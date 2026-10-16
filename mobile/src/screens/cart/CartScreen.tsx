@@ -16,7 +16,7 @@ import { GrandTotalRow, SummaryRow } from '../../components/OrderSummary';
 import { useAuth } from '../../context/AuthContext';
 import { useCart } from '../../context/CartContext';
 import { getErrorMessage } from '../../api/client';
-import { colors, radius, shadow, spacing } from '../../theme';
+import { colors, font, radius, shadow, spacing, tagPalette } from '../../theme';
 import { formatVND } from '../../utils/format';
 import { FREE_SHIPPING_THRESHOLD } from '../../constants';
 import { baseShippingFee } from '../../utils/discount';
@@ -253,7 +253,7 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.sm,
   },
   headerTitle: { fontSize: 24, fontWeight: '800', color: colors.text, letterSpacing: -0.5 },
-  headerCount: { fontSize: 13, color: colors.textMuted },
+  headerCount: { fontSize: 13, fontWeight: '600', color: colors.textMuted },
 
   // Thanh tiến độ miễn phí ship là một thẻ nổi, không phải dải kẻ ngang suốt màn:
   // nó là thông tin của giỏ hàng này, không phải thanh trạng thái của cả trang.
@@ -264,15 +264,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
     borderRadius: radius.lg,
-    backgroundColor: colors.primarySoft,
+    backgroundColor: colors.surface,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.border,
   },
-  shipBarOk: { backgroundColor: '#f0fbe8' },
+  shipBarOk: { backgroundColor: tagPalette.green.bg, borderColor: tagPalette.green.bg },
   shipRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   shipText: { flex: 1, fontSize: 12.5, color: colors.textSecondary, fontWeight: '600' },
   shipTrack: {
     height: 5,
     borderRadius: radius.pill,
-    backgroundColor: colors.surface,
+    backgroundColor: colors.bg,
     overflow: 'hidden',
   },
   shipFill: { height: 5, borderRadius: radius.pill, backgroundColor: colors.primary },
@@ -308,6 +310,8 @@ const styles = StyleSheet.create({
     padding: spacing.md,
     backgroundColor: colors.surface,
     borderRadius: radius.xl,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.border,
     ...shadow.card,
   },
   rowCheck: { padding: 2 },
@@ -315,7 +319,7 @@ const styles = StyleSheet.create({
   thumb: { borderRadius: radius.lg },
   rowBody: { flex: 1, gap: spacing.xs },
   name: { fontSize: 13.5, color: colors.text, lineHeight: 19 },
-  price: { fontSize: 15, fontWeight: '700', color: colors.primary },
+  price: { fontSize: 15.5, color: colors.ink, ...font.price },
   rowActions: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -323,13 +327,14 @@ const styles = StyleSheet.create({
     marginTop: spacing.xs,
   },
   removeBtn: { padding: 6, borderRadius: radius.md },
-  removeBtnPressed: { backgroundColor: colors.bg },
+  removeBtnPressed: { backgroundColor: colors.surfaceAlt },
 
+  // Viền tóc đậm thay cho bóng hắt lên: thanh tổng tiền phẳng, mép vẫn rõ khi danh
+  // sách cuộn bên dưới.
   footer: {
     padding: spacing.lg,
     backgroundColor: colors.surface,
-    borderTopLeftRadius: radius.xl,
-    borderTopRightRadius: radius.xl,
-    ...shadow.raised,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.borderStrong,
   },
 });

@@ -1,4 +1,5 @@
 // Trang tài khoản — cửa vào các chức năng cá nhân.
+import { Fragment } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import Ionicons, { type IoniconsIconName } from '@react-native-vector-icons/ionicons/static';
 import { useNavigation } from '@react-navigation/native';
@@ -44,9 +45,9 @@ export default function AccountScreen() {
     return (
       <Screen>
         <View style={styles.guest}>
-          <Gradient colors={gradient.brandSoft} style={styles.guestIcon}>
+          <View style={styles.guestIcon}>
             <Ionicons name="person-outline" size={34} color={colors.primary} />
-          </Gradient>
+          </View>
           <Text style={styles.guestTitle}>Bạn chưa đăng nhập</Text>
           <Text style={styles.guestDesc}>
             Đăng nhập để mua hàng, theo dõi đơn và lưu lại các phiên tư vấn với trợ lý AI.
@@ -117,17 +118,19 @@ export default function AccountScreen() {
   return (
     <Screen>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={[styles.scroll, { paddingBottom: tabBarHeight + spacing.lg }]}>
-        {/* ---- Thẻ hồ sơ ---- */}
-        <View style={styles.profile}>
-          <Gradient colors={gradient.brand} style={styles.avatar}>
+        {/* ---- Thẻ hồ sơ ----
+            Khối màu mực như đầu trang chủ, chữ đại diện trên ô xanh ngọc: đọc như thẻ
+            thành viên của cửa hàng, tách hẳn khỏi các nhóm menu trắng bên dưới. */}
+        <Gradient colors={gradient.brand} style={styles.profile}>
+          <View style={styles.avatar}>
             <Text style={styles.avatarText}>{avatarInitial(user.full_name)}</Text>
-          </Gradient>
+          </View>
           <View style={styles.flex}>
-            <Text style={styles.name}>{user.full_name}</Text>
-            <Text style={styles.email}>{user.email ?? user.phone_number ?? '—'}</Text>
+            <Text style={styles.name} numberOfLines={1}>{user.full_name}</Text>
+            <Text style={styles.email} numberOfLines={1}>{user.email ?? user.phone_number ?? '—'}</Text>
             <Text style={styles.since}>Thành viên từ {formatDateShort(user.created_at)}</Text>
           </View>
-        </View>
+        </Gradient>
 
         <MenuGroup title="Mua sắm" items={shopping} />
         <MenuGroup title="Tài khoản" items={personal} />
@@ -156,29 +159,37 @@ function MenuGroup({ title, items }: { title: string; items: MenuItem[] }) {
       <Text style={styles.groupTitle}>{title}</Text>
       <View style={styles.groupBody}>
         {items.map((item, i) => (
-          <Pressable
-            key={item.label}
-            accessibilityRole="button"
-            accessibilityState={{ disabled: !!item.upcoming }}
-            onPress={item.onPress}
-            disabled={!item.onPress}
-            style={[styles.row, i > 0 && styles.rowBorder]}
-          >
-            <View style={styles.rowIcon}>
-              <Ionicons name={item.icon} size={19} color={colors.primary} />
-            </View>
-            <View style={styles.flex}>
-              <Text style={[styles.rowLabel, item.upcoming && styles.rowLabelMuted]}>{item.label}</Text>
-              {item.hint ? <Text style={styles.rowHint}>{item.hint}</Text> : null}
-            </View>
-            {item.upcoming ? (
-              <View style={styles.soonTag}>
-                <Text style={styles.soonText}>Vòng sau</Text>
+          <Fragment key={item.label}>
+            {/* Vạch ngăn thụt vào sau ô biểu tượng, giống danh sách cài đặt của hệ
+                điều hành — cột biểu tượng liền mạch, mắt dò theo cột chữ. */}
+            {i > 0 ? <View style={styles.separator} /> : null}
+            <Pressable
+              accessibilityRole="button"
+              accessibilityState={{ disabled: !!item.upcoming }}
+              onPress={item.onPress}
+              disabled={!item.onPress}
+              style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
+            >
+              <View style={styles.rowIcon}>
+                <Ionicons
+                  name={item.icon}
+                  size={19}
+                  color={item.upcoming ? colors.textMuted : colors.ink}
+                />
               </View>
-            ) : (
-              <Ionicons name="chevron-forward" size={17} color={colors.textMuted} />
-            )}
-          </Pressable>
+              <View style={styles.flex}>
+                <Text style={[styles.rowLabel, item.upcoming && styles.rowLabelMuted]}>{item.label}</Text>
+                {item.hint ? <Text style={styles.rowHint}>{item.hint}</Text> : null}
+              </View>
+              {item.upcoming ? (
+                <View style={styles.soonTag}>
+                  <Text style={styles.soonText}>Vòng sau</Text>
+                </View>
+              ) : (
+                <Ionicons name="chevron-forward" size={17} color={colors.textMuted} />
+              )}
+            </Pressable>
+          </Fragment>
         ))}
       </View>
     </View>
@@ -194,12 +205,13 @@ const styles = StyleSheet.create({
     width: 84,
     height: 84,
     borderRadius: 42,
+    backgroundColor: colors.primarySoft,
     alignItems: 'center',
     justifyContent: 'center',
     alignSelf: 'center',
     marginBottom: spacing.md,
   },
-  guestTitle: { fontSize: 18, fontWeight: '700', color: colors.text, textAlign: 'center' },
+  guestTitle: { fontSize: 20, fontWeight: '800', color: colors.text, textAlign: 'center', letterSpacing: -0.4 },
   guestDesc: {
     fontSize: 14,
     color: colors.textMuted,
@@ -214,49 +226,73 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: spacing.lg,
     padding: spacing.lg,
-    backgroundColor: colors.surface,
+    paddingVertical: spacing.xl,
     borderRadius: radius.xl,
-    ...shadow.card,
   },
   avatar: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
+    width: 56,
+    height: 56,
+    borderRadius: radius.lg,
+    backgroundColor: colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  avatarText: { fontSize: 24, fontWeight: '800', color: colors.textInverse },
-  name: { fontSize: 18, fontWeight: '700', color: colors.text, letterSpacing: -0.3 },
-  email: { fontSize: 13, color: colors.textSecondary, marginTop: 2 },
-  since: { fontSize: 11.5, color: colors.textMuted, marginTop: 3 },
+  avatarText: { fontSize: 24, fontWeight: '900', color: colors.textInverse, letterSpacing: -0.5 },
+  name: { fontSize: 19, fontWeight: '800', color: colors.textInverse, letterSpacing: -0.4 },
+  email: { fontSize: 13, color: 'rgba(255,255,255,0.72)', marginTop: 3 },
+  since: { fontSize: 11.5, color: 'rgba(255,255,255,0.5)', marginTop: 4 },
 
   group: { gap: spacing.sm },
   groupTitle: {
-    fontSize: 12,
-    fontWeight: '700',
+    fontSize: 11,
+    fontWeight: '800',
     color: colors.textMuted,
-    letterSpacing: 0.5,
+    letterSpacing: 0.9,
     textTransform: 'uppercase',
     paddingHorizontal: spacing.xs,
   },
-  groupBody: { backgroundColor: colors.surface, borderRadius: radius.xl, ...shadow.card },
-  row: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, padding: spacing.lg },
-  rowBorder: { borderTopWidth: 1, borderTopColor: colors.border },
+  groupBody: {
+    backgroundColor: colors.surface,
+    borderRadius: radius.xl,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.border,
+    ...shadow.card,
+  },
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md + 2,
+  },
+  // Mờ đi chứ không tô nền: hàng đầu/cuối tô nền sẽ lòi góc vuông ra ngoài mép bo
+  // của thẻ (thẻ không bật overflow:hidden vì iOS sẽ cắt luôn bóng đổ).
+  rowPressed: { opacity: 0.6 },
+  // Thụt đúng bằng lề trái + ô biểu tượng (36) + khoảng cách.
+  separator: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: colors.border,
+    marginLeft: spacing.lg + 36 + spacing.md,
+  },
   rowIcon: {
-    width: 38,
-    height: 38,
-    borderRadius: radius.lg,
-    backgroundColor: colors.primarySoft,
+    width: 36,
+    height: 36,
+    borderRadius: radius.md,
+    backgroundColor: colors.surfaceAlt,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.border,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  rowLabel: { fontSize: 14.5, fontWeight: '600', color: colors.text },
+  rowLabel: { fontSize: 15, fontWeight: '600', color: colors.text, letterSpacing: -0.1 },
   rowLabelMuted: { color: colors.textSecondary },
   rowHint: { fontSize: 12, color: colors.textMuted, marginTop: 2 },
   soonTag: {
-    paddingHorizontal: spacing.md,
+    paddingHorizontal: spacing.sm,
     paddingVertical: 3,
-    borderRadius: radius.pill,
+    borderRadius: radius.sm,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.borderStrong,
     backgroundColor: colors.surfaceAlt,
   },
   soonText: { fontSize: 10.5, fontWeight: '700', color: colors.textMuted },

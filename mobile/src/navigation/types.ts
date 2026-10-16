@@ -10,7 +10,8 @@ export type TabParamList = {
   Products:
     | { categoryId?: string; keyword?: string; brand?: string; sort?: NonNullable<ProductQuery['sort']> }
     | undefined;
-  Chat: undefined;
+  // `prompt`: câu hỏi mẫu gửi ngay khi mở (khối "Bắt đầu theo nhu cầu" ở trang chủ).
+  Chat: { prompt?: string } | undefined;
   Cart: undefined;
   Account: undefined;
 };
